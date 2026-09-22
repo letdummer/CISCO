@@ -63,25 +63,39 @@ A configuração inicial garante a identificação única do equipamento na rede
 ! Entrar no modo de configuração global
 enable
 configure terminal
+```
+
 
 ! 1. Alterar o nome do dispositivo
+```
 hostname R1-CORE
+```
+
 
 ! 2. Mensagem legal de aviso ao ligar
+
+```
 banner motd #Acesso Restrito! Apenas Pessoal Autorizado.#
+```
 
 ! 3. Proteção do Modo EXEC Privilegiado
+```
 enable secret cisco123
+```
 
 ! 4. Proteção da Porta de Consola
-line console 0
+
+```
+ line console 0
  password cisco
  login
  logging synchronous
  exec-timeout 5 0
  exit
+```
 
 ! 5. Encriptação geral de palavras-passe em texto limpo
+```
 service password-encryption
 ```
 
@@ -112,18 +126,25 @@ SW-MAIN(config-vlan)# name Servidores
 SW-MAIN(config-vlan)# vlan 99
 SW-MAIN(config-vlan)# name Gestao
 SW-MAIN(config-vlan)# exit
+```
 
 ! Configurar porta ligada ao Router R1-CORE como Trunk
+```
 SW-MAIN(config)# interface gigabitEthernet 0/0
 SW-MAIN(config-if)# switchport mode trunk
 SW-MAIN(config-if)# exit
+```
+
 
 ! Configurar ligações com SW-ACCESS1 e SW-ACCESS2 como Trunk
+```
 SW-MAIN(config)# interface range gigabitEthernet 0/1 - 2
 SW-MAIN(config-if)# switchport mode trunk
 SW-MAIN(config-if)# exit
+```
 
 ! Configurar porta do Servidor DHCP (SRV-DHCP) na VLAN 30
+```
 SW-MAIN(config)# interface fastEthernet 0/24
 SW-MAIN(config-if)# switchport mode access
 SW-MAIN(config-if)# switchport access vlan 30
@@ -142,18 +163,24 @@ SW-ACCESS1(config-vlan)# name Servidores
 SW-ACCESS1(config-vlan)# vlan 99
 SW-ACCESS1(config-vlan)# name Gestao
 SW-ACCESS1(config-vlan)# exit
+```
 
 ! Porta Tronco para o SW-MAIN
+```
 SW-ACCESS1(config)# interface gigabitEthernet 0/1
 SW-ACCESS1(config-if)# switchport mode trunk
 SW-ACCESS1(config-if)# exit
+```
 
 ! Portas de Acesso para os PCs no SW-ACCESS1
+```
 SW-ACCESS1(config)# interface fastEthernet 0/1
 SW-ACCESS1(config-if)# switchport mode access
 SW-ACCESS1(config-if)# switchport access vlan 10
 SW-ACCESS1(config-if)# exit
+```
 
+```
 SW-ACCESS1(config)# interface fastEthernet 0/2
 SW-ACCESS1(config-if)# switchport mode access
 SW-ACCESS1(config-if)# switchport access vlan 20
@@ -178,8 +205,10 @@ SW-ACCESS1(config-if)# description Interface_Gestao_SW1
 SW-ACCESS1(config-if)# ip address 192.168.10.163 255.255.255.224
 SW-ACCESS1(config-if)# no shutdown
 SW-ACCESS1(config-if)# exit
+```
 
 ! Apontar o Gateway padrão do Switch para o IP do Router na VLAN 99
+```
 SW-ACCESS1(config)# ip default-gateway 192.168.10.161
 ```
 
@@ -200,26 +229,34 @@ R1-CORE(config)# interface gigabitEthernet 0/0/0
 R1-CORE(config-if)# description Link_Tronco_ROAS_SW-MAIN
 R1-CORE(config-if)# no shutdown
 R1-CORE(config-if)# exit
+```
 
 ! Sub-interface VLAN 10 (Vendas)
+```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.10
 R1-CORE(config-subif)# encapsulation dot1Q 10
 R1-CORE(config-subif)# ip address 192.168.10.1 255.255.255.192
 R1-CORE(config-subif)# exit
+```
 
 ! Sub-interface VLAN 20 (Engenharia)
+```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.20
 R1-CORE(config-subif)# encapsulation dot1Q 20
 R1-CORE(config-subif)# ip address 192.168.10.65 255.255.255.192
 R1-CORE(config-subif)# exit
+```
 
 ! Sub-interface VLAN 30 (Servidores)
+```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.30
 R1-CORE(config-subif)# encapsulation dot1Q 30
 R1-CORE(config-subif)# ip address 192.168.10.129 255.255.255.224
 R1-CORE(config-subif)# exit
+```
 
 ! Sub-interface VLAN 99 (Gestão)
+```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.99
 R1-CORE(config-subif)# encapsulation dot1Q 99
 R1-CORE(config-subif)# ip address 192.168.10.161 255.255.255.224
@@ -268,12 +305,14 @@ Como as mensagens `DHCPDISCOVER` são enviadas em *broadcast*, os routers bloque
 
 #### Comandos na CLI (R1-CORE)
 
-```bash
 ! Aplicar o agente de retransmissão nas sub-interfaces das VLANs clientes
+```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.10
 R1-CORE(config-subif)# ip helper-address 192.168.10.130
 R1-CORE(config-subif)# exit
+```
 
+```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.20
 R1-CORE(config-subif)# ip helper-address 192.168.10.130
 R1-CORE(config-subif)# exit
