@@ -59,31 +59,32 @@ A configuração inicial garante a identificação única do equipamento na rede
 
 #### Comandos na CLI (R1-CORE, SW-MAIN, SW-ACCESS1 e SW-ACCESS2)
 
-```bash
+
 ! Entrar no modo de configuração global
+```bash
 enable
 configure terminal
 ```
 
 
-! 1. Alterar o nome do dispositivo
+### 1. Alterar o nome do dispositivo
 ```
 hostname R1-CORE
 ```
 
 
-! 2. Mensagem legal de aviso ao ligar
+### 2. Mensagem legal de aviso ao ligar
 
 ```
 banner motd #Acesso Restrito! Apenas Pessoal Autorizado.#
 ```
 
-! 3. Proteção do Modo EXEC Privilegiado
+### 3. Proteção do Modo EXEC Privilegiado
 ```
 enable secret cisco123
 ```
 
-! 4. Proteção da Porta de Consola
+### 4. Proteção da Porta de Consola
 
 ```
  line console 0
@@ -94,7 +95,7 @@ enable secret cisco123
  exit
 ```
 
-! 5. Encriptação geral de palavras-passe em texto limpo
+### 5. Encriptação geral de palavras-passe em texto limpo
 ```
 service password-encryption
 ```
@@ -128,7 +129,7 @@ SW-MAIN(config-vlan)# name Gestao
 SW-MAIN(config-vlan)# exit
 ```
 
-! Configurar porta ligada ao Router R1-CORE como Trunk
+### Configurar porta ligada ao Router R1-CORE como Trunk
 ```
 SW-MAIN(config)# interface gigabitEthernet 0/0
 SW-MAIN(config-if)# switchport mode trunk
@@ -136,14 +137,14 @@ SW-MAIN(config-if)# exit
 ```
 
 
-! Configurar ligações com SW-ACCESS1 e SW-ACCESS2 como Trunk
+### Configurar ligações com SW-ACCESS1 e SW-ACCESS2 como Trunk
 ```
 SW-MAIN(config)# interface range gigabitEthernet 0/1 - 2
 SW-MAIN(config-if)# switchport mode trunk
 SW-MAIN(config-if)# exit
 ```
 
-! Configurar porta do Servidor DHCP (SRV-DHCP) na VLAN 30
+### Configurar porta do Servidor DHCP (SRV-DHCP) na VLAN 30
 ```
 SW-MAIN(config)# interface fastEthernet 0/24
 SW-MAIN(config-if)# switchport mode access
@@ -165,14 +166,14 @@ SW-ACCESS1(config-vlan)# name Gestao
 SW-ACCESS1(config-vlan)# exit
 ```
 
-! Porta Tronco para o SW-MAIN
+### Porta Tronco para o SW-MAIN
 ```
 SW-ACCESS1(config)# interface gigabitEthernet 0/1
 SW-ACCESS1(config-if)# switchport mode trunk
 SW-ACCESS1(config-if)# exit
 ```
 
-! Portas de Acesso para os PCs no SW-ACCESS1
+### Portas de Acesso para os PCs no SW-ACCESS1
 ```
 SW-ACCESS1(config)# interface fastEthernet 0/1
 SW-ACCESS1(config-if)# switchport mode access
@@ -207,7 +208,7 @@ SW-ACCESS1(config-if)# no shutdown
 SW-ACCESS1(config-if)# exit
 ```
 
-! Apontar o Gateway padrão do Switch para o IP do Router na VLAN 99
+### Apontar o Gateway padrão do Switch para o IP do Router na VLAN 99
 ```
 SW-ACCESS1(config)# ip default-gateway 192.168.10.161
 ```
@@ -231,7 +232,7 @@ R1-CORE(config-if)# no shutdown
 R1-CORE(config-if)# exit
 ```
 
-! Sub-interface VLAN 10 (Vendas)
+### Sub-interface VLAN 10 (Vendas)
 ```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.10
 R1-CORE(config-subif)# encapsulation dot1Q 10
@@ -239,7 +240,7 @@ R1-CORE(config-subif)# ip address 192.168.10.1 255.255.255.192
 R1-CORE(config-subif)# exit
 ```
 
-! Sub-interface VLAN 20 (Engenharia)
+### Sub-interface VLAN 20 (Engenharia)
 ```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.20
 R1-CORE(config-subif)# encapsulation dot1Q 20
@@ -247,7 +248,7 @@ R1-CORE(config-subif)# ip address 192.168.10.65 255.255.255.192
 R1-CORE(config-subif)# exit
 ```
 
-! Sub-interface VLAN 30 (Servidores)
+### Sub-interface VLAN 30 (Servidores)
 ```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.30
 R1-CORE(config-subif)# encapsulation dot1Q 30
@@ -255,7 +256,7 @@ R1-CORE(config-subif)# ip address 192.168.10.129 255.255.255.224
 R1-CORE(config-subif)# exit
 ```
 
-! Sub-interface VLAN 99 (Gestão)
+### Sub-interface VLAN 99 (Gestão)
 ```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.99
 R1-CORE(config-subif)# encapsulation dot1Q 99
@@ -305,7 +306,7 @@ Como as mensagens `DHCPDISCOVER` são enviadas em *broadcast*, os routers bloque
 
 #### Comandos na CLI (R1-CORE)
 
-! Aplicar o agente de retransmissão nas sub-interfaces das VLANs clientes
+### Aplicar o agente de retransmissão nas sub-interfaces das VLANs clientes
 ```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.10
 R1-CORE(config-subif)# ip helper-address 192.168.10.130
