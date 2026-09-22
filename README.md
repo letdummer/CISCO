@@ -374,7 +374,3 @@ R1(config)# interface gigabitEthernet 0/0/0.20
 R1(config-subif)# ip helper-address 10.1.1.2
 R1(config-subif)# exit
 ```
-
----
-
-💡 **Próximo Passo**: Gostaria de simular um cenário prático completo no Cisco Packet Tracer com estes tópicos interligados (incluindo o roteamento ROAS e DHCP Relay em simultâneo)?
