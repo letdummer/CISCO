@@ -8,14 +8,14 @@ Este guia apresenta o passo a passo completo para montar e configurar um cenári
 
 ### Dispositivos do Laboratório
 
-- **1 Router:** R1-CORE (Cisco 2911 / ISR 4221)
+- **1 Router:** Router-01 (Cisco 2911 / ISR 4221)
 - **1 Switch Principal (Distribuição/Core):** SW-00 (Cisco 2960 ou 3560)
 - **2 Switches de Acesso:** SW-01 e SW-02 (Cisco 2960)
 - **1 Servidor Dedicado:** SRV-DHCP (Servidor DHCP Central)
 - **5 PCs Clientes:** PC1, PC2, PC3, PC4 e PC5
 
 ```
-                              [ R1-CORE ]
+                              [ Router-01 ]
                                    |
                      (Gi0/0/0 - Trunk / ROAS)
                                    |
@@ -40,7 +40,7 @@ Este guia apresenta o passo a passo completo para montar e configurar um cenári
 
 > Bloco Base `192.168.10.0/24` subdividido com VLSM / CIDR
 
-| VLAN | Nome da VLAN | Sub-rede IP | Máscara / CIDR | Gateway Padrão (R1-CORE) | Dispositivos Associados |
+| VLAN | Nome da VLAN | Sub-rede IP | Máscara / CIDR | Gateway Padrão (Router-01) | Dispositivos Associados |
 |:---:|:---|:---|:---|:---|:---|
 | VLAN 10 | Estudantes | 192.168.10.0 | 255.255.255.192 (/26) | 192.168.10.1 | PC1 (Fa0/1), PC3 (Fa0/1) |
 | VLAN 20 | Professores | 192.168.10.64 | 255.255.255.192 (/26) | 192.168.10.65 | PC2 (Fa0/2), PC4 (Fa0/2) |
@@ -57,7 +57,7 @@ Este guia apresenta o passo a passo completo para montar e configurar um cenári
 
 A configuração inicial garante a identificação única do equipamento na rede (`hostname`), estabelece avisos de acesso não autorizado (`banner motd`), protege o acesso físico via porta de consola e cifra todas as credenciais gravadas na memória RAM em texto limpo (`service password-encryption`).
 
-#### Comandos na CLI (R1-CORE, SW-00, SW-01 e SW-02)
+#### Comandos na CLI (Router-01, SW-00, SW-01 e SW-02)
 ## -> Para cada dispositivo, alterar apenas o `hostname`
 
 ! Entrar no modo de configuração global
@@ -129,7 +129,7 @@ SW-00(config-vlan)# name Gestao
 SW-00(config-vlan)# exit
 ```
 
-### Configurar porta ligada ao Router R1-CORE como Trunk
+### Configurar porta ligada ao Router Router-01 como Trunk
 ```
 SW-00(config)# interface gigabitEthernet 0/1
 SW-00(config-if)# switchport mode trunk
@@ -223,45 +223,45 @@ SW-01(config)# ip default-gateway 192.168.10.161
 
 O tráfego intra-VLAN ocorre diretamente no switch (Camada 2). Para permitir a comunicação inter-VLAN, utiliza-se a técnica **ROAS** (*Router-on-a-Stick*), onde uma única porta física do router (`Gi0/0/0`) é conectada a uma porta tronco do switch. A interface física é dividida em sub-interfaces lógicas, associando cada uma à sua respetiva VLAN através do enquadramento `encapsulation dot1Q`.
 
-#### Comandos na CLI (R1-CORE)
+#### Comandos na CLI (Router-01)
 
 ```bash
-R1-CORE(config)# interface gigabitEthernet 0/0/0
-R1-CORE(config-if)# description Link_Tronco_ROAS_SW-00
-R1-CORE(config-if)# no shutdown
-R1-CORE(config-if)# exit
+Router-01(config)# interface gigabitEthernet 0/0/0
+Router-01(config-if)# description Link_Tronco_ROAS_SW-00
+Router-01(config-if)# no shutdown
+Router-01(config-if)# exit
 ```
 
 ### Sub-interface VLAN 10 (Estudantes)
 ```
-R1-CORE(config)# interface gigabitEthernet 0/0/0.10
-R1-CORE(config-subif)# encapsulation dot1Q 10
-R1-CORE(config-subif)# ip address 192.168.10.1 255.255.255.192
-R1-CORE(config-subif)# exit
+Router-01(config)# interface gigabitEthernet 0/0/0.10
+Router-01(config-subif)# encapsulation dot1Q 10
+Router-01(config-subif)# ip address 192.168.10.1 255.255.255.192
+Router-01(config-subif)# exit
 ```
 
 ### Sub-interface VLAN 20 (Professores)
 ```
-R1-CORE(config)# interface gigabitEthernet 0/0/0.20
-R1-CORE(config-subif)# encapsulation dot1Q 20
-R1-CORE(config-subif)# ip address 192.168.10.65 255.255.255.192
-R1-CORE(config-subif)# exit
+Router-01(config)# interface gigabitEthernet 0/0/0.20
+Router-01(config-subif)# encapsulation dot1Q 20
+Router-01(config-subif)# ip address 192.168.10.65 255.255.255.192
+Router-01(config-subif)# exit
 ```
 
 ### Sub-interface VLAN 30 (Servidores)
 ```
-R1-CORE(config)# interface gigabitEthernet 0/0/0.30
-R1-CORE(config-subif)# encapsulation dot1Q 30
-R1-CORE(config-subif)# ip address 192.168.10.129 255.255.255.224
-R1-CORE(config-subif)# exit
+Router-01(config)# interface gigabitEthernet 0/0/0.30
+Router-01(config-subif)# encapsulation dot1Q 30
+Router-01(config-subif)# ip address 192.168.10.129 255.255.255.224
+Router-01(config-subif)# exit
 ```
 
 ### Sub-interface VLAN 99 (Gestão)
 ```
-R1-CORE(config)# interface gigabitEthernet 0/0/0.99
-R1-CORE(config-subif)# encapsulation dot1Q 99
-R1-CORE(config-subif)# ip address 192.168.10.161 255.255.255.224
-R1-CORE(config-subif)# exit
+Router-01(config)# interface gigabitEthernet 0/0/0.99
+Router-01(config-subif)# encapsulation dot1Q 99
+Router-01(config-subif)# ip address 192.168.10.161 255.255.255.224
+Router-01(config-subif)# exit
 ```
 
 ---
@@ -304,22 +304,22 @@ O protocolo DHCP automatiza a distribuição de IPs pelo ciclo **DORA** (*Discov
 
 Como as mensagens `DHCPDISCOVER` são enviadas em *broadcast*, os routers bloqueiam a sua passagem entre sub-redes. O comando `ip helper-address` transforma o *broadcast* recebido na interface dos clientes num pacote *unicast* direcionado ao IP do Servidor DHCP Central (`192.168.10.130`).
 
-#### Comandos na CLI (R1-CORE)
+#### Comandos na CLI (Router-01)
 
 ### Aplicar o agente de retransmissão nas sub-interfaces das VLANs clientes
 ```
-R1-CORE(config)# interface gigabitEthernet 0/0/0.10
-R1-CORE(config-subif)# ip helper-address 192.168.10.130
-R1-CORE(config-subif)# exit
+Router-01(config)# interface gigabitEthernet 0/0/0.10
+Router-01(config-subif)# ip helper-address 192.168.10.130
+Router-01(config-subif)# exit
 ```
 
 ```
-R1-CORE(config)# interface gigabitEthernet 0/0/0.20
-R1-CORE(config-subif)# ip helper-address 192.168.10.130
-R1-CORE(config-subif)# exit
+Router-01(config)# interface gigabitEthernet 0/0/0.20
+Router-01(config-subif)# ip helper-address 192.168.10.130
+Router-01(config-subif)# exit
 ```
 
-> A partir deste momento, quando o PC1 ou PC2 solicitarem IP via DHCP, o R1-CORE reencaminhará o pedido para o SRV-DHCP na VLAN 30.
+> A partir deste momento, quando o PC1 ou PC2 solicitarem IP via DHCP, o Router-01 reencaminhará o pedido para o SRV-DHCP na VLAN 30.
 
 ---
 
@@ -328,22 +328,22 @@ R1-CORE(config-subif)# exit
 #### Explicação Técnica
 
 - **Telnet** (Porta TCP 23): Transmite credenciais em texto simples sem encriptação (configurado nos switches de acesso para fins de teste).
-- **SSH** (Porta TCP 22): Cifra o tráfego de gestão utilizando chaves RSA (configurado no Router R1-CORE).
+- **SSH** (Porta TCP 22): Cifra o tráfego de gestão utilizando chaves RSA (configurado no Router Router-01).
 
 #### Comandos na CLI
 
-**1. SSH no Router (R1-CORE):**
+**1. SSH no Router (Router-01):**
 
 ```bash
-R1-CORE(config)# ip domain-name empresa.local
-R1-CORE(config)# username admin secret AdminPass123
-R1-CORE(config)# crypto key generate rsa 1024
-R1-CORE(config)# ip ssh version 2
-R1-CORE(config)# line vty 0 4
-R1-CORE(config-line)# login local
-R1-CORE(config-line)# transport input ssh
-R1-CORE(config-line)# exec-timeout 10 0
-R1-CORE(config-line)# exit
+Router-01(config)# ip domain-name empresa.local
+Router-01(config)# username admin secret AdminPass123
+Router-01(config)# crypto key generate rsa 1024
+Router-01(config)# ip ssh version 2
+Router-01(config)# line vty 0 4
+Router-01(config-line)# login local
+Router-01(config-line)# transport input ssh
+Router-01(config-line)# exec-timeout 10 0
+Router-01(config-line)# exit
 ```
 
 **2. Telnet nos Switches (SW-01 — Exemplo):**
