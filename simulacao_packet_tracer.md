@@ -9,8 +9,8 @@ Este guia apresenta o passo a passo completo para montar e configurar um cenári
 ### Dispositivos do Laboratório
 
 - **1 Router:** R1-CORE (Cisco 2911 / ISR 4221)
-- **1 Switch Principal (Distribuição/Core):** SW-MAIN (Cisco 2960 ou 3560)
-- **2 Switches de Acesso:** SW-ACCESS1 e SW-ACCESS2 (Cisco 2960)
+- **1 Switch Principal (Distribuição/Core):** SW-00 (Cisco 2960 ou 3560)
+- **2 Switches de Acesso:** SW-01 e SW-02 (Cisco 2960)
 - **1 Servidor Dedicado:** SRV-DHCP (Servidor DHCP Central)
 - **5 PCs Clientes:** PC1, PC2, PC3, PC4 e PC5
 
@@ -19,13 +19,13 @@ Este guia apresenta o passo a passo completo para montar e configurar um cenári
                                    |
                      (Gi0/0/0 - Trunk / ROAS)
                                    |
-                             [ SW-MAIN ]
+                             [ SW-00 ]
                              /    |    \
                 (Trunk Gi0/1)  |   (Trunk Gi0/2)
                           /      |      \
                 (Fa0/24) /       |       \
                         /        |        \
-              [ SW-ACCESS1 ]     |    [ SW-ACCESS2 ]
+              [ SW-01 ]     |    [ SW-02 ]
                    / \      [SRV-DHCP]      / \
           (Fa0/1) /   \ (Fa0/2)      (Fa0/1)/   \ (Fa0/2)
                 [PC1] [PC2]              [PC3] [PC4]
@@ -45,7 +45,7 @@ Este guia apresenta o passo a passo completo para montar e configurar um cenári
 | VLAN 10 | Estudantes | 192.168.10.0 | 255.255.255.192 (/26) | 192.168.10.1 | PC1 (Fa0/1), PC3 (Fa0/1) |
 | VLAN 20 | Professores | 192.168.10.64 | 255.255.255.192 (/26) | 192.168.10.65 | PC2 (Fa0/2), PC4 (Fa0/2) |
 | VLAN 30 | Servidores | 192.168.10.128 | 255.255.255.224 (/27) | 192.168.10.129 | SRV-DHCP (.130), PC5 (Fa0/3) |
-| VLAN 99 | Gestão | 192.168.10.160 | 255.255.255.224 (/27) | 192.168.10.161 | SVIs: SW-MAIN (.162), SW-ACC1 (.163), SW-ACC2 (.164) |
+| VLAN 99 | Gestão | 192.168.10.160 | 255.255.255.224 (/27) | 192.168.10.161 | SVIs: SW-00 (.162), SW-ACC1 (.163), SW-ACC2 (.164) |
 
 ---
 
@@ -57,7 +57,7 @@ Este guia apresenta o passo a passo completo para montar e configurar um cenári
 
 A configuração inicial garante a identificação única do equipamento na rede (`hostname`), estabelece avisos de acesso não autorizado (`banner motd`), protege o acesso físico via porta de consola e cifra todas as credenciais gravadas na memória RAM em texto limpo (`service password-encryption`).
 
-#### Comandos na CLI (R1-CORE, SW-MAIN, SW-ACCESS1 e SW-ACCESS2)
+#### Comandos na CLI (R1-CORE, SW-00, SW-01 e SW-02)
 ## -> Para cada dispositivo, alterar apenas o `hostname`
 
 ! Entrar no modo de configuração global
@@ -69,7 +69,7 @@ configure terminal
 
 ### 1. Alterar o nome do dispositivo
 ```
-hostname R1-CORE
+hostname Router-01
 ```
 
 
@@ -100,7 +100,7 @@ enable secret cisco123
 service password-encryption
 ```
 
-> Repetir estes comandos básicos ajustando o `hostname` em cada switch: `SW-MAIN`, `SW-ACCESS1`, `SW-ACCESS2`.
+> Repetir estes comandos básicos ajustando o `hostname` em cada switch: `SW-00`, `SW-01`, `SW-02`.
 
 ---
 
@@ -115,80 +115,80 @@ As VLANs segmentam o domínio de broadcast na Camada 2.
 
 #### Comandos na CLI
 
-**1. No Switch Principal (SW-MAIN) — Criar VLANs e Ativar Troncos:**
+**1. No Switch Principal (SW-00) — Criar VLANs e Ativar Troncos:**
 
 ```bash
-SW-MAIN(config)# vlan 10
-SW-MAIN(config-vlan)# name Estudantes
-SW-MAIN(config-vlan)# vlan 20
-SW-MAIN(config-vlan)# name Professores
-SW-MAIN(config-vlan)# vlan 30
-SW-MAIN(config-vlan)# name Servidores
-SW-MAIN(config-vlan)# vlan 99
-SW-MAIN(config-vlan)# name Gestao
-SW-MAIN(config-vlan)# exit
+SW-00(config)# vlan 10
+SW-00(config-vlan)# name Estudantes
+SW-00(config-vlan)# vlan 20
+SW-00(config-vlan)# name Professores
+SW-00(config-vlan)# vlan 30
+SW-00(config-vlan)# name Servidores
+SW-00(config-vlan)# vlan 99
+SW-00(config-vlan)# name Gestao
+SW-00(config-vlan)# exit
 ```
 
 ### Configurar porta ligada ao Router R1-CORE como Trunk
 ```
-SW-MAIN(config)# interface gigabitEthernet 0/0
-SW-MAIN(config-if)# switchport mode trunk
-SW-MAIN(config-if)# exit
+SW-00(config)# interface gigabitEthernet 0/1
+SW-00(config-if)# switchport mode trunk
+SW-00(config-if)# exit
 ```
 
 
-### Configurar ligações com SW-ACCESS1 e SW-ACCESS2 como Trunk
+### Configurar ligações com SW-01 e SW-02 como Trunk
 ```
-SW-MAIN(config)# interface range gigabitEthernet 0/1 - 2
-SW-MAIN(config-if)# switchport mode trunk
-SW-MAIN(config-if)# exit
+SW-00(config)# interface range gigabitEthernet 0/1 - 2
+SW-00(config-if)# switchport mode trunk
+SW-00(config-if)# exit
 ```
 
 ### Configurar porta do Servidor DHCP (SRV-DHCP) na VLAN 30
 ```
-SW-MAIN(config)# interface fastEthernet 0/24
-SW-MAIN(config-if)# switchport mode access
-SW-MAIN(config-if)# switchport access vlan 30
-SW-MAIN(config-if)# exit
+SW-00(config)# interface fastEthernet 0/24
+SW-00(config-if)# switchport mode access
+SW-00(config-if)# switchport access vlan 30
+SW-00(config-if)# exit
 ```
 
-**2. Nos Switches de Acesso (SW-ACCESS1 e SW-ACCESS2):**
+**2. Nos Switches de Acesso (SW-01 e SW-02):**
 
 ```bash
-SW-ACCESS1(config)# vlan 10
-SW-ACCESS1(config-vlan)# name Estudantes
-SW-ACCESS1(config-vlan)# vlan 20
-SW-ACCESS1(config-vlan)# name Professores
-SW-ACCESS1(config-vlan)# vlan 30
-SW-ACCESS1(config-vlan)# name Servidores
-SW-ACCESS1(config-vlan)# vlan 99
-SW-ACCESS1(config-vlan)# name Gestao
-SW-ACCESS1(config-vlan)# exit
+SW-01(config)# vlan 10
+SW-01(config-vlan)# name Estudantes
+SW-01(config-vlan)# vlan 20
+SW-01(config-vlan)# name Professores
+SW-01(config-vlan)# vlan 30
+SW-01(config-vlan)# name Servidores
+SW-01(config-vlan)# vlan 99
+SW-01(config-vlan)# name Gestao
+SW-01(config-vlan)# exit
 ```
 
-### Porta Tronco para o SW-MAIN
+### Porta Tronco para o SW-00
 ```
-SW-ACCESS1(config)# interface gigabitEthernet 0/1
-SW-ACCESS1(config-if)# switchport mode trunk
-SW-ACCESS1(config-if)# exit
-```
-
-### Portas de Acesso para os PCs no SW-ACCESS1
-```
-SW-ACCESS1(config)# interface fastEthernet 0/1
-SW-ACCESS1(config-if)# switchport mode access
-SW-ACCESS1(config-if)# switchport access vlan 10
-SW-ACCESS1(config-if)# exit
+SW-01(config)# interface gigabitEthernet 0/1
+SW-01(config-if)# switchport mode trunk
+SW-01(config-if)# exit
 ```
 
+### Portas de Acesso para os PCs no SW-01
 ```
-SW-ACCESS1(config)# interface fastEthernet 0/2
-SW-ACCESS1(config-if)# switchport mode access
-SW-ACCESS1(config-if)# switchport access vlan 20
-SW-ACCESS1(config-if)# exit
+SW-01(config)# interface fastEthernet 0/1
+SW-01(config-if)# switchport mode access
+SW-01(config-if)# switchport access vlan 10
+SW-01(config-if)# exit
 ```
 
-> No `SW-ACCESS2`: repetir criação de VLANs, meter `Gi0/1` em Trunk, `Fa0/1` na VLAN 10, `Fa0/2` na VLAN 20 e `Fa0/3` na VLAN 30 para o PC5.
+```
+SW-01(config)# interface fastEthernet 0/2
+SW-01(config-if)# switchport mode access
+SW-01(config-if)# switchport access vlan 20
+SW-01(config-if)# exit
+```
+
+> No `SW-02`: repetir criação de VLANs, meter `Gi0/1` em Trunk, `Fa0/1` na VLAN 10, `Fa0/2` na VLAN 20 e `Fa0/3` na VLAN 30 para o PC5.
 
 ---
 
@@ -198,22 +198,22 @@ SW-ACCESS1(config-if)# exit
 
 Uma **SVI** (*Switch Virtual Interface*) é uma interface lógica de Camada 3 configurada dentro do switch que permite atribuir um endereço IP para gestão remota. Como o switch opera na Camada 2, ele precisa de um *Default Gateway* para responder a pacotes vindos de sub-redes/VLANs diferentes da sua SVI.
 
-#### Comandos na CLI (SW-ACCESS1 — Exemplo)
+#### Comandos na CLI (SW-01 — Exemplo)
 
 ```bash
-SW-ACCESS1(config)# interface vlan 99
-SW-ACCESS1(config-if)# description Interface_Gestao_SW1
-SW-ACCESS1(config-if)# ip address 192.168.10.163 255.255.255.224
-SW-ACCESS1(config-if)# no shutdown
-SW-ACCESS1(config-if)# exit
+SW-01(config)# interface vlan 99
+SW-01(config-if)# description Interface_Gestao_SW1
+SW-01(config-if)# ip address 192.168.10.163 255.255.255.224
+SW-01(config-if)# no shutdown
+SW-01(config-if)# exit
 ```
 
 ### Apontar o Gateway padrão do Switch para o IP do Router na VLAN 99
 ```
-SW-ACCESS1(config)# ip default-gateway 192.168.10.161
+SW-01(config)# ip default-gateway 192.168.10.161
 ```
 
-> SVI do `SW-MAIN`: `192.168.10.162/27` | SVI do `SW-ACCESS2`: `192.168.10.164/27` | Gateway de ambos: `192.168.10.161`
+> SVI do `SW-00`: `192.168.10.162/27` | SVI do `SW-02`: `192.168.10.164/27` | Gateway de ambos: `192.168.10.161`
 
 ---
 
@@ -227,7 +227,7 @@ O tráfego intra-VLAN ocorre diretamente no switch (Camada 2). Para permitir a c
 
 ```bash
 R1-CORE(config)# interface gigabitEthernet 0/0/0
-R1-CORE(config-if)# description Link_Tronco_ROAS_SW-MAIN
+R1-CORE(config-if)# description Link_Tronco_ROAS_SW-00
 R1-CORE(config-if)# no shutdown
 R1-CORE(config-if)# exit
 ```
@@ -346,15 +346,15 @@ R1-CORE(config-line)# exec-timeout 10 0
 R1-CORE(config-line)# exit
 ```
 
-**2. Telnet nos Switches (SW-ACCESS1 — Exemplo):**
+**2. Telnet nos Switches (SW-01 — Exemplo):**
 
 ```bash
-SW-ACCESS1(config)# line vty 0 15
-SW-ACCESS1(config-line)# password cisco
-SW-ACCESS1(config-line)# login
-SW-ACCESS1(config-line)# transport input telnet
-SW-ACCESS1(config-line)# exec-timeout 5 0
-SW-ACCESS1(config-line)# exit
+SW-01(config)# line vty 0 15
+SW-01(config-line)# password cisco
+SW-01(config-line)# login
+SW-01(config-line)# transport input telnet
+SW-01(config-line)# exec-timeout 5 0
+SW-01(config-line)# exit
 ```
 
 ---
