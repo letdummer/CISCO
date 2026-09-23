@@ -58,7 +58,7 @@ Este guia apresenta o passo a passo completo para montar e configurar um cenári
 A configuração inicial garante a identificação única do equipamento na rede (`hostname`), estabelece avisos de acesso não autorizado (`banner motd`), protege o acesso físico via porta de consola e cifra todas as credenciais gravadas na memória RAM em texto limpo (`service password-encryption`).
 
 #### Comandos na CLI (R1-CORE, SW-MAIN, SW-ACCESS1 e SW-ACCESS2)
-
+## -> Para cada dispositivo, alterar apenas o `hostname`
 
 ! Entrar no modo de configuração global
 ```bash
