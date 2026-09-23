@@ -42,8 +42,8 @@ Este guia apresenta o passo a passo completo para montar e configurar um cenári
 
 | VLAN | Nome da VLAN | Sub-rede IP | Máscara / CIDR | Gateway Padrão (R1-CORE) | Dispositivos Associados |
 |:---:|:---|:---|:---|:---|:---|
-| VLAN 10 | Vendas | 192.168.10.0 | 255.255.255.192 (/26) | 192.168.10.1 | PC1 (Fa0/1), PC3 (Fa0/1) |
-| VLAN 20 | Engenharia | 192.168.10.64 | 255.255.255.192 (/26) | 192.168.10.65 | PC2 (Fa0/2), PC4 (Fa0/2) |
+| VLAN 10 | Estudantes | 192.168.10.0 | 255.255.255.192 (/26) | 192.168.10.1 | PC1 (Fa0/1), PC3 (Fa0/1) |
+| VLAN 20 | Professores | 192.168.10.64 | 255.255.255.192 (/26) | 192.168.10.65 | PC2 (Fa0/2), PC4 (Fa0/2) |
 | VLAN 30 | Servidores | 192.168.10.128 | 255.255.255.224 (/27) | 192.168.10.129 | SRV-DHCP (.130), PC5 (Fa0/3) |
 | VLAN 99 | Gestão | 192.168.10.160 | 255.255.255.224 (/27) | 192.168.10.161 | SVIs: SW-MAIN (.162), SW-ACC1 (.163), SW-ACC2 (.164) |
 
@@ -119,9 +119,9 @@ As VLANs segmentam o domínio de broadcast na Camada 2.
 
 ```bash
 SW-MAIN(config)# vlan 10
-SW-MAIN(config-vlan)# name Vendas
+SW-MAIN(config-vlan)# name Estudantes
 SW-MAIN(config-vlan)# vlan 20
-SW-MAIN(config-vlan)# name Engenharia
+SW-MAIN(config-vlan)# name Professores
 SW-MAIN(config-vlan)# vlan 30
 SW-MAIN(config-vlan)# name Servidores
 SW-MAIN(config-vlan)# vlan 99
@@ -156,9 +156,9 @@ SW-MAIN(config-if)# exit
 
 ```bash
 SW-ACCESS1(config)# vlan 10
-SW-ACCESS1(config-vlan)# name Vendas
+SW-ACCESS1(config-vlan)# name Estudantes
 SW-ACCESS1(config-vlan)# vlan 20
-SW-ACCESS1(config-vlan)# name Engenharia
+SW-ACCESS1(config-vlan)# name Professores
 SW-ACCESS1(config-vlan)# vlan 30
 SW-ACCESS1(config-vlan)# name Servidores
 SW-ACCESS1(config-vlan)# vlan 99
@@ -232,7 +232,7 @@ R1-CORE(config-if)# no shutdown
 R1-CORE(config-if)# exit
 ```
 
-### Sub-interface VLAN 10 (Vendas)
+### Sub-interface VLAN 10 (Estudantes)
 ```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.10
 R1-CORE(config-subif)# encapsulation dot1Q 10
@@ -240,7 +240,7 @@ R1-CORE(config-subif)# ip address 192.168.10.1 255.255.255.192
 R1-CORE(config-subif)# exit
 ```
 
-### Sub-interface VLAN 20 (Engenharia)
+### Sub-interface VLAN 20 (Professores)
 ```
 R1-CORE(config)# interface gigabitEthernet 0/0/0.20
 R1-CORE(config-subif)# encapsulation dot1Q 20
@@ -282,15 +282,15 @@ O protocolo DHCP automatiza a distribuição de IPs pelo ciclo **DORA** (*Discov
 2. Separador **Services** → **DHCP**:
    - Ativar o serviço: `Service = On`
 
-   **Pool 1 (VLAN 10 - Vendas):**
-   - Pool Name: `POOL-VENDAS`
+   **Pool 1 (VLAN 10 - Estudantes):**
+   - Pool Name: `POOL-Estudantes`
    - Default Gateway: `192.168.10.1`
    - DNS Server: `8.8.8.8`
    - Start IP Address: `192.168.10.10`
    - Subnet Mask: `255.255.255.192` → Clique em **Add**
 
-   **Pool 2 (VLAN 20 - Engenharia):**
-   - Pool Name: `POOL-ENGENHARIA`
+   **Pool 2 (VLAN 20 - Professores):**
+   - Pool Name: `POOL-Professores`
    - Default Gateway: `192.168.10.65`
    - DNS Server: `8.8.8.8`
    - Start IP Address: `192.168.10.75`
