@@ -129,7 +129,7 @@ SW-00(config-vlan)# name Gestao
 SW-00(config-vlan)# exit
 ```
 
-### Configurar porta ligada ao Router Router-01 como Trunk
+**Configurar porta ligada ao Router Router-01 como Trunk**
 ```
 SW-00(config)# interface gigabitEthernet 0/1
 SW-00(config-if)# switchport mode trunk
@@ -137,16 +137,16 @@ SW-00(config-if)# exit
 ```
 
 
-### Configurar ligações com SW-01 e SW-02 como Trunk
+**Configurar ligações com SW-01 e SW-02 como Trunk**
 ```
 SW-00(config)# interface range gigabitEthernet 0/1 - 2
 SW-00(config-if)# switchport mode trunk
 SW-00(config-if)# exit
 ```
 
-### Configurar porta do Servidor DHCP (SRV-DHCP) na VLAN 30
+**Configurar porta do Servidor DHCP (SRV-DHCP) na VLAN 30**
 ```
-SW-00(config)# interface fastEthernet 0/24
+SW-00(config)# interface fastEthernet 0/2
 SW-00(config-if)# switchport mode access
 SW-00(config-if)# switchport access vlan 30
 SW-00(config-if)# exit
@@ -166,29 +166,50 @@ SW-01(config-vlan)# name Gestao
 SW-01(config-vlan)# exit
 ```
 
-### Porta Tronco para o SW-00
+**Configurar Trunk para o Router (Gig0/0 do Router <-> Gig0/1 do SW-00)**
 ```
-SW-01(config)# interface gigabitEthernet 0/1
-SW-01(config-if)# switchport mode trunk
-SW-01(config-if)# exit
+SW-00(config)# interface gigabitEthernet 0/1
+SW-00(config-if)# switchport mode trunk
+SW-00(config-if)# no shutdown
+SW-00(config-if)# exit
 ```
 
-### Portas de Acesso para os PCs no SW-01
+**PConfigurar Trunk para os Switches SW-01 (Fa0/3) e SW-02 (Fa0/4)**
+```
+SW-00(config)# interface range fastEthernet 0/3 - 4
+SW-00(config-if)# switchport mode trunk
+SW-00(config-if)# no shutdown
+SW-00(config-if)# exit
+```
+
+**Configurar a porta do Servidor DHCP (Fa0/2) na VLAN 30**
+```
+SW-00(config)# interface fastEthernet 0/2
+SW-00(config-if)# switchport mode access
+SW-00(config-if)# switchport access vlan 30
+SW-00(config-if)# no shutdown
+SW-00(config-if)# exit
+```
+
+
+**Configuração Requerida nos Switches de Acesso (SW-01 e SW-02)**
+Para a comunicação funcionar em ambos os sentidos, não se esqueça de ativar o Trunk nas portas Fa0/1 de cada um dos switches de acesso:
+
+# SW-01:
 ```
 SW-01(config)# interface fastEthernet 0/1
-SW-01(config-if)# switchport mode access
-SW-01(config-if)# switchport access vlan 10
+SW-01(config-if)# switchport mode trunk
+SW-01(config-if)# no shutdown
 SW-01(config-if)# exit
 ```
 
+# SW-02:
 ```
-SW-01(config)# interface fastEthernet 0/2
-SW-01(config-if)# switchport mode access
-SW-01(config-if)# switchport access vlan 20
-SW-01(config-if)# exit
+SW-02(config)# interface fastEthernet 0/1
+SW-02(config-if)# switchport mode trunk
+SW-02(config-if)# no shutdown
+SW-02(config-if)# exit
 ```
-
-> No `SW-02`: repetir criação de VLANs, meter `Gi0/1` em Trunk, `Fa0/1` na VLAN 10, `Fa0/2` na VLAN 20 e `Fa0/3` na VLAN 30 para o PC5.
 
 ---
 
