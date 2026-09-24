@@ -17,7 +17,8 @@
    - [Tópico 5 — Testes de ping](#-tópico-5--testes-de-ping-resultado-atualizado-com-o-router)
    - [Tópico 6 — VLAN 999 e SSH](#-tópico-6--vlan-999-gestão-e-acesso-ssh)
    - [Tópico 7 — PC na Fa0/10](#-tópico-7--pc-na-fa010-com-vlan-999)
-   - [Tópico 8 — Testar SSH](#-tópico-8--testar-o-acesso-ssh)
+   - [Tópico 8 — Fechar portas](#-tópico-8--fechar-portas)
+   - [Testar SSH](#-testar-o-acesso-ssh)
 3. [Resumo dos resultados esperados](#3-resumo-dos-resultados-esperados-com-router0-instalado)
 4. [Checklist rápido](#4-checklist-rápido)
 
@@ -330,7 +331,67 @@ Switch0(config-if)# write memory
 
 ---
 
-### » Tópico 8 — Testar o acesso SSH
+### » Tópico 8 — FECHAR PORTAS
+
+**SWITCH 0 (Switch Central):**
+- Portas em uso: Fa0/1, Fa0/2, Fa0/3 (trunks).
+- Portas sem uso para fechar: Fa0/4 até Fa0/24 + Gi0/1 e Gi0/2.
+
+```
+Switch0> enable
+Switch0# configure terminal
+```
+
+
+! Seleciona o intervalo de portas FastEthernet de 4 a 24 e as portas Gigabit
+```
+Switch0(config)# interface range fastEthernet 0/4 - 24 , gigabitEthernet 0/1 - 2
+Switch0(config-if-range)# shutdown
+Switch0(config-if-range)# exit
+```
+
+**SWITCH 1 e 2 (Switches de Acesso):**
+- Portas em uso: Fa0/1, Fa0/2, Fa0/3 (PCs) e Fa0/24 (trunk).
+
+- Portas sem uso para fechar: Fa0/4 até Fa0/23 + Gi0/1 e Gi0/2.
+(Se tiveres a porta Fa0/10 atribuída à VLAN 999 para o PC-Gestao, lembra-te de não a incluir no range).
+
+```
+Switch1> enable
+Switch1# configure terminal
+```
+
+! Exemplo desativando portas 4 a 9, 11 a 23 e Gigabit:
+```
+Switch1(config)# interface range fastEthernet 0/4 - 9 , fastEthernet 0/11 - 23 , gigabitEthernet 0/1 - 2
+Switch1(config-if-range)# shutdown
+Switch1(config-if-range)# exit
+```
+
+***Mover portas não utilizadas para uma VLAN sem tráfego (Boa Prática de Segurança)***
+
+`Além de dar shutdown, é uma recomendação oficial de hardening da Cisco mover todas as portas não utilizadas para uma VLAN dedicada sem acesso a nada (ex.: VLAN 99 ou VLAN 666 apelidada de Blackhole ou Unused).`
+
+```
+Switch0(config)# vlan 99
+Switch0(config-vlan)# name Portas_Inativas
+Switch0(config-vlan)# exit
+
+Switch0(config)# interface range fastEthernet 0/4 - 24 , gigabitEthernet 0/1 - 2
+Switch0(config-if-range)# switchport mode access
+Switch0(config-if-range)# switchport access vlan 99
+Switch0(config-if-range)# shutdown
+Switch0(config-if-range)# exit
+```
+
+***Como verificar se as portas ficaram fechadas?***
+Usa o comando em modo privilegiado para ver o estado das interfaces:
+
+``` 
+show ip interface brief
+```
+
+### — Testar o acesso SSH
 
 **Teste 1 — a partir do `PC-Gestao` (VLAN 999):**
 ```bash
