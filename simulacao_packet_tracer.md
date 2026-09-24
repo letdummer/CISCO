@@ -114,44 +114,41 @@ write memory
 ### » Tópico 2 — Portas de acesso e trunk
 
 <details>
-<summary><strong>Switch0</strong> — PC0, PC1, PC2 + trunk para Switch2</summary>
+<summary><strong>Switch0</strong> — Central (Trunks para Switch1, Switch2 e Router0)</summary>
 
 ```bash
 Switch0(config)# interface fastEthernet 0/1
-Switch0(config-if)# switchport mode access
-Switch0(config-if)# switchport access vlan 10
+Switch0(config-if)# switchport mode trunk
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
 
-write memory
-
 Switch0(config)# interface fastEthernet 0/2
-Switch0(config-if)# switchport mode access
-Switch0(config-if)# switchport access vlan 20
+Switch0(config-if)# switchport mode trunk
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
 
 Switch0(config)# interface fastEthernet 0/3
-Switch0(config-if)# switchport mode access
-Switch0(config-if)# switchport access vlan 30
-Switch0(config-if)# no shutdown
-Switch0(config-if)# exit
-
-Switch0(config)# interface fastEthernet 0/24
 Switch0(config-if)# switchport mode trunk
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
-Switch0(config-if)# write memory
+
+Switch0(config)# exit
+Switch0# write memory
 ```
-</details>
 
-<details>
-<summary><strong>Switch1</strong> — PC3, PC4, PC5 + trunk para Switch2</summary>
+**1. Trunk**
+```
+Switch1(config)# interface fastEthernet 0/24
+Switch1(config-if)# switchport mode trunk
+Switch1(config-if)# no shutdown
+Switch1(config-if)# exit
+```
 
-```bash
+**2. Portas de acesso aos PCs**
+```
 Switch1(config)# interface fastEthernet 0/1
 Switch1(config-if)# switchport mode access
-Switch1(config-if)# switchport access vlan 30
+Switch1(config-if)# switchport access vlan 10
 Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
 
@@ -163,39 +160,15 @@ Switch1(config-if)# exit
 
 Switch1(config)# interface fastEthernet 0/3
 Switch1(config-if)# switchport mode access
-Switch1(config-if)# switchport access vlan 10
+Switch1(config-if)# switchport access vlan 30
 Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
 
-Switch1(config)# interface fastEthernet 0/24
-Switch1(config-if)# switchport mode trunk
-Switch1(config-if)# no shutdown
-Switch1(config-if)# exit
-Switch1(config-if)# write memory
+Switch1(config)# exit
+Switch1# write memory
 ```
-</details>
 
-<details>
-<summary><strong>Switch2</strong> — trunks para Switch0, Switch1 e Router0</summary>
-
-```bash
-Switch2(config)# interface fastEthernet 0/1
-Switch2(config-if)# switchport mode trunk
-Switch2(config-if)# no shutdown
-Switch2(config-if)# exit
-
-Switch2(config)# interface fastEthernet 0/2
-Switch2(config-if)# switchport mode trunk
-Switch2(config-if)# no shutdown
-Switch2(config-if)# exit
-
-Switch2(config)# interface fastEthernet 0/3
-Switch2(config-if)# switchport mode trunk
-Switch2(config-if)# no shutdown
-Switch2(config-if)# exit
-Switch2(config-if)# write memory
-```
-</details>
+`REPETIR PARA O SW-2`
 
 ---
 
