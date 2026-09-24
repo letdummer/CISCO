@@ -113,7 +113,6 @@ write memory
 
 ### » Tópico 2 — Portas de acesso e trunk
 
-<details>
 <summary><strong>Switch0</strong> — Central (Trunks para Switch1, Switch2 e Router0)</summary>
 
 ```bash
@@ -169,6 +168,7 @@ Switch1# write memory
 ```
 
 `REPETIR PARA O SW-2`
+
 
 ---
 
