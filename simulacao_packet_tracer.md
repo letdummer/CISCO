@@ -78,6 +78,15 @@
 
 # 2. Passo a Passo no Cisco IOS
 
+### ! ALTERAR HOSTNAME DE CADA DISPOSITIVO ! 
+
+```
+enable
+configure terminal
+hostname NAME
+```
+
+
 ### » Tópico 1 — Criar as VLANs 10, 20 e 30
 
 Repetir em `Switch0`, `Switch1` e `Switch2`:
