@@ -29,9 +29,9 @@
 
 | Dispositivo | Papel |
 |---|---|
-| `Switch0` | Switch de acesso — liga PC0, PC1, PC2 |
-| `Switch1` | Switch de acesso — liga PC3, PC4, PC5 |
-| `Switch2` | Switch central — liga `Switch0`, `Switch1` e `Router0` por trunk |
+| `Switch0` | Switch central (distribuição) — liga Switch1, Switch2 e Router0 por trunk |
+| `Switch1` | Switch de acesso — liga PC0, PC1, PC2 |
+| `Switch2` | Switch de acesso — liga PC3, PC4, PC5 |
 | `Router0` | Router-on-a-Stick — faz o routing inter-VLAN |
 | `PC0`–`PC5` | Terminais dos utilizadores |
 
@@ -41,11 +41,11 @@
                                 [ Router0 ]
                                 Gi0/0 (trunk / ROAS)
                                      |
-                     [ Switch2 ]  (central, sem PCs)
+                     [ Switch0 ]  (central, sem PCs)
               Fa0/1 |      Fa0/2 |      | Fa0/3
           (trunk)   |  (trunk)   |      | (trunk, p/ Router0)
                      |            |
-        [ Switch0 ]---            ---[ Switch1 ]
+        [ Switch1 ]---            ---[ Switch2 ]
      Fa0/1: PC0 (VLAN10)          Fa0/1: PC3 (VLAN30)
      Fa0/2: PC1 (VLAN20)          Fa0/2: PC4 (VLAN20)
      Fa0/3: PC2 (VLAN30)          Fa0/3: PC5 (VLAN10)
@@ -58,8 +58,8 @@
 |:---:|:---|:---|:---|:---|
 | `10` | Estudantes | `192.168.10.0` | `/24` | `192.168.10.1` |
 | `20` | Professores | `192.168.20.0` | `/24` | `192.168.20.1` |
-| `30` | *(não é pedido renomear)* | `192.168.30.0` | `/24` | `192.168.30.1` |
-| `999` | gestao | `10.0.0.0` | `/8` | — *(sem gateway, ver nota)* |
+| `30` | Direcao | `192.168.30.0` | `/24` | `192.168.30.1` |
+| `999` | Gestao | `10.0.0.0` | `/8` | — *(sem gateway, ver nota)* |
 
 > 📌 **Nota:** a VLAN 999 **não** tem sub-interface no router propositadamente, para a rede de gestão ficar isolada das VLANs de utilizador — isto mantém válidos os testes de SSH dos pontos 12 e 13 do enunciado.
 
@@ -90,7 +90,9 @@ vlan 10
 vlan 20
  name Professores
 vlan 30
+ name Direcao
 exit
+write memory
 ```
 
 ---
@@ -106,6 +108,8 @@ Switch0(config-if)# switchport mode access
 Switch0(config-if)# switchport access vlan 10
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
+
+write memory
 
 Switch0(config)# interface fastEthernet 0/2
 Switch0(config-if)# switchport mode access
@@ -123,6 +127,7 @@ Switch0(config)# interface fastEthernet 0/24
 Switch0(config-if)# switchport mode trunk
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
+Switch0(config-if)# write memory
 ```
 </details>
 
@@ -152,6 +157,7 @@ Switch1(config)# interface fastEthernet 0/24
 Switch1(config-if)# switchport mode trunk
 Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
+Switch1(config-if)# write memory
 ```
 </details>
 
@@ -173,6 +179,7 @@ Switch2(config)# interface fastEthernet 0/3
 Switch2(config-if)# switchport mode trunk
 Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
+Switch2(config-if)# write memory
 ```
 </details>
 
@@ -213,6 +220,7 @@ Router0(config)# interface gigabitEthernet 0/0.30
 Router0(config-subif)# encapsulation dot1Q 30
 Router0(config-subif)# ip address 192.168.30.1 255.255.255.0
 Router0(config-subif)# exit
+Router0(config-if)# write memory
 ```
 
 > 📌 A interface física `Gi0/0` **não** recebe IP quando se usam sub-interfaces — só precisa de `no shutdown`. Repara que **não existe** `Gi0/0.999`: a VLAN de gestão fica fora do routing de propósito.
@@ -243,33 +251,37 @@ Repetir em `Switch0`, `Switch1` e `Switch2`, mudando apenas o IP:
 
 ```bash
 Switch0(config)# vlan 999
-Switch0(config-vlan)# name gestao
+Switch0(config-vlan)# name Gestao
 Switch0(config-vlan)# exit
 
 Switch0(config)# interface vlan 999
 Switch0(config-if)# ip address 10.0.0.1 255.0.0.0
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
+Switch0(config-vlan)# write memory
 ```
+
 ```bash
 Switch1(config)# vlan 999
-Switch1(config-vlan)# name gestao
+Switch1(config-vlan)# name Gestao
 Switch1(config-vlan)# exit
 
 Switch1(config)# interface vlan 999
 Switch1(config-if)# ip address 10.0.0.2 255.0.0.0
 Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
+Switch1(config-vlan)# write memory
 ```
 ```bash
 Switch2(config)# vlan 999
-Switch2(config-vlan)# name gestao
+Switch2(config-vlan)# name Gestao
 Switch2(config-vlan)# exit
 
 Switch2(config)# interface vlan 999
 Switch2(config-if)# ip address 10.0.0.3 255.0.0.0
 Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
+Switch2(config-vlan)# write memory
 ```
 
 **SSH** (repetir nos três switches):
@@ -295,6 +307,8 @@ Switch0(config-if)# switchport mode access
 Switch0(config-if)# switchport access vlan 999
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
+Switch0(config-if)# write memory
+
 ```
 
 | Dispositivo | IP | Máscara |
@@ -345,7 +359,7 @@ ssh -l admin 10.0.0.1
 - [ ] Teste de ping 8a realizado (sucesso esperado)
 - [ ] Teste de ping 8b realizado (sucesso esperado, com router)
 - [ ] Teste de ping 8c realizado (sucesso esperado)
-- [ ] VLAN 999 `gestao` criada e SVI atribuída nos 3 switches
+- [ ] VLAN 999 `Gestao` criada e SVI atribuída nos 3 switches
 - [ ] SSH configurado (`domain-name`, `username`, RSA 2048 bits, `line vty`) nos 3 switches
 - [ ] `PC-Gestao` ligado à `Fa0/10`, VLAN999, IP `10.0.0.10`
 - [ ] Teste SSH 12 realizado (sucesso esperado)
