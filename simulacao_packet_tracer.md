@@ -1,463 +1,352 @@
-# Guia de Simulação Prática de Laboratório no Cisco Packet Tracer (Versão Corrigida)
+# Guia de Simulação — VLANs, Trunk, Router-on-a-Stick e Gestão SSH (Cisco Packet Tracer)
 
-> **Nota importante:** este documento corrige os erros de cópia (prompts trocados, IPs duplicados, portas inconsistentes) encontrados na versão original. Antes de colar os comandos, confirma os **nomes reais dos dispositivos e das portas** no teu ficheiro `.pkt`, pois a topologia que montaste usa nomes ligeiramente diferentes (ex.: `PC0-PC4`, `Switch0/Switch1/Switch2`, `Server0`). Os nomes usados abaixo (`Router-01`, `SW-00`, `PC1..PC5`) são os do enunciado original — substitui-os pelos teus conforme necessário.
+> Este guia parte do enunciado "VLANS" (ex1_vlans, 3 switches Cisco 2960-24TT, sem router) e **acrescenta um router configurado em Router-on-a-Stick (ROAS)** para fazer routing inter-VLAN. Confirma os nomes reais dos teus dispositivos e portas no teu `.pkt` — os nomes usados abaixo (`Switch0`, `Switch1`, `Switch2`, `Router0`, `Fa0/1`...`Fa0/24`, `Gi0/0`) são um exemplo coerente com o diagrama original; ajusta-os se a tua topologia usar outros números.
 
-Este guia apresenta o passo a passo completo para montar e configurar um cenário corporativo simulado no Cisco Packet Tracer, englobando a arquitetura física, segmentação em VLANs, roteamento Inter-VLAN (ROAS), serviços de infraestrutura (DHCP Server e Relay), gestão de interfaces virtuais (SVI) e acessos remotos seguros (SSH e Telnet).
-
----
-
-## 1. Topologia da Rede e Tabela de Endereçamento
-
-### Dispositivos do Laboratório
-
-- **1 Router:** Router-01 (Cisco 2911) — *usar sempre a notação `Gi0/0` fixa, coerente com os comandos do Tópico 4*
-- **1 Switch Principal (Distribuição/Core):** SW-00
-- **2 Switches de Acesso:** SW-01 e SW-02
-- **1 Servidor Dedicado:** SRV-DHCP
-- **5 PCs Clientes:** PC1, PC2, PC3, PC4 e PC5
-
-```
-                              [ Router-01 ]
-                                   |
-                          Gi0/0 (Trunk / ROAS)
-                                   |
-                             [ SW-00 ]
-                        Fa0/1 (trunk, Router)
-                        Fa0/2 (access, SRV-DHCP)
-                        Fa0/3 (trunk, SW-01)
-                        Fa0/4 (trunk, SW-02)
-                             /          \
-                       [ SW-01 ]      [ SW-02 ]
-                       Fa0/1: trunk    Fa0/1: trunk
-                       Fa0/2: PC1 (V10) Fa0/2: PC3 (V10)
-                       Fa0/3: PC2 (V20) Fa0/3: PC4 (V20)
-                                        Fa0/4: PC5 (V30)
-```
-
-**Correção aplicada:** o desenho original misturava duas numerações de porta diferentes para o SW-00 (`Gi0/1`/`Gi0/2`/`Fa0/24` no diagrama vs. `Fa0/3`/`Fa0/4`/`Fa0/2` nos comandos). Ficou fixada a numeração usada nos comandos, que é a que realmente se aplica no IOS.
-
-### Mapeamento de VLANs e Sub-redes
-
-> Bloco Base `192.168.10.0/24` subdividido com VLSM / CIDR
-
-| VLAN | Nome da VLAN | Sub-rede IP | Máscara / CIDR | Gateway Padrão (Router-01) | Dispositivos Associados |
-|:---:|:---|:---|:---|:---|:---|
-| VLAN 10 | Estudantes | 192.168.10.0 | 255.255.255.192 (/26) | 192.168.10.1 | PC1 (Fa0/1), PC3 (Fa0/1) |
-| VLAN 20 | Professores | 192.168.10.64 | 255.255.255.192 (/26) | 192.168.10.65 | PC2 (Fa0/2), PC4 (Fa0/2) |
-| VLAN 30 | Servidores | 192.168.10.128 | 255.255.255.224 (/27) | 192.168.10.129 | SRV-DHCP (.130), PC5 (Fa0/3) |
-| VLAN 99 | Gestão | 192.168.10.160 | 255.255.255.224 (/27) | 192.168.10.161 | SVIs: SW-00 (.162), SW-01 (.163), SW-02 (.164) |
+> ⚠️ **Atenção:** o enunciado original (ponto 8b) espera que o ping **entre VLANs diferentes falhe**, porque a topologia base não tem router. Com o Router-on-a-Stick deste guia, esse teste passa a **ter sucesso**. Se este documento for para entregar como resposta ao enunciado original, confirma com o professor se a adição do router é pretendida.
 
 ---
 
-## 2. Passo a Passo da Configuração no Cisco IOS
+## Índice
 
-### TÓPICO 1: Comandos Básicos e Segurança Inicial
+1. [Topologia e Endereçamento](#1-topologia-e-endereçamento)
+2. [Passo a Passo no Cisco IOS](#2-passo-a-passo-no-cisco-ios)
+   - [Tópico 1 — Criar VLANs](»tópico-1--criar-as-vlans-10-20-e-30)
+   - [Tópico 2 — Portas de acesso e trunk](#tópico-2--portas-de-acesso-e-trunk)
+   - [Tópico 3 — Router-on-a-Stick](#tópico-3--router-on-a-stick-router0)
+   - [Tópico 4 — IP e gateway dos PCs](#tópico-4--atribuir-ip-e-gateway-aos-pcs)
+   - [Tópico 5 — Testes de ping](#tópico-5--testes-de-ping-resultado-atualizado-com-o-router)
+   - [Tópico 6 — VLAN 999 e SSH](#tópico-6--vlan-999-gestão-e-acesso-ssh)
+   - [Tópico 7 — PC na Fa0/10](#tópico-7--pc-na-fa010-com-vlan-999)
+   - [Tópico 8 — Testar SSH](#tópico-8--testar-o-acesso-ssh)
+3. [Resumo dos resultados esperados](#3-resumo-dos-resultados-esperados-com-router0-instalado)
+4. [Checklist rápido](#4-checklist-rápido)
 
-#### Explicação Técnica
+---
 
-A configuração inicial garante a identificação única do equipamento na rede (`hostname`), estabelece avisos de acesso não autorizado (`banner motd`), protege o acesso físico via porta de consola e cifra todas as credenciais gravadas na memória em texto limpo (`service password-encryption`).
+# 1. Topologia e Endereçamento
 
-#### Comandos na CLI (Router-01, SW-00, SW-01 e SW-02)
-*Para cada dispositivo, alterar apenas o `hostname` conforme o equipamento.*
+### » Dispositivos
+
+| Dispositivo | Papel |
+|---|---|
+| `Switch0` | Switch de acesso — liga PC0, PC1, PC2 |
+| `Switch1` | Switch de acesso — liga PC3, PC4, PC5 |
+| `Switch2` | Switch central — liga `Switch0`, `Switch1` e `Router0` por trunk |
+| `Router0` | Router-on-a-Stick — faz o routing inter-VLAN |
+| `PC0`–`PC5` | Terminais dos utilizadores |
+
+### » Diagrama
+
+```
+                                [ Router0 ]
+                                Gi0/0 (trunk / ROAS)
+                                     |
+                     [ Switch2 ]  (central, sem PCs)
+              Fa0/1 |      Fa0/2 |      | Fa0/3
+          (trunk)   |  (trunk)   |      | (trunk, p/ Router0)
+                     |            |
+        [ Switch0 ]---            ---[ Switch1 ]
+     Fa0/1: PC0 (VLAN10)          Fa0/1: PC3 (VLAN30)
+     Fa0/2: PC1 (VLAN20)          Fa0/2: PC4 (VLAN20)
+     Fa0/3: PC2 (VLAN30)          Fa0/3: PC5 (VLAN10)
+     Fa0/24: trunk → Switch2      Fa0/24: trunk → Switch2
+```
+
+### » VLANs, sub-redes e gateway
+
+| VLAN | Nome | Sub-rede | Máscara | Gateway (`Router0`) |
+|:---:|:---|:---|:---|:---|
+| `10` | Estudantes | `192.168.10.0` | `/24` | `192.168.10.1` |
+| `20` | Professores | `192.168.20.0` | `/24` | `192.168.20.1` |
+| `30` | *(não é pedido renomear)* | `192.168.30.0` | `/24` | `192.168.30.1` |
+| `999` | gestao | `10.0.0.0` | `/8` | — *(sem gateway, ver nota)* |
+
+> 📌 **Nota:** a VLAN 999 **não** tem sub-interface no router propositadamente, para a rede de gestão ficar isolada das VLANs de utilizador — isto mantém válidos os testes de SSH dos pontos 12 e 13 do enunciado.
+
+### » Endereços IP dos PCs
+
+| PC | VLAN | IP | Máscara | Gateway |
+|---|:---:|---|---|---|
+| `PC0` | 10 | `192.168.10.10` | `/24` | `192.168.10.1` |
+| `PC5` | 10 | `192.168.10.11` | `/24` | `192.168.10.1` |
+| `PC1` | 20 | `192.168.20.10` | `/24` | `192.168.20.1` |
+| `PC4` | 20 | `192.168.20.11` | `/24` | `192.168.20.1` |
+| `PC2` | 30 | `192.168.30.10` | `/24` | `192.168.30.1` |
+| `PC3` | 30 | `192.168.30.11` | `/24` | `192.168.30.1` |
+
+---
+
+# 2. Passo a Passo no Cisco IOS
+
+### » Tópico 1 — Criar as VLANs 10, 20 e 30
+
+Repetir em `Switch0`, `Switch1` e `Switch2`:
 
 ```bash
 enable
 configure terminal
-```
-
-**1. Alterar o nome do dispositivo**
-```
-hostname Router-01
-```
-
-**2. Mensagem legal de aviso ao ligar**
-```
-banner motd #Acesso Restrito! Apenas Pessoal Autorizado.#
-```
-
-**3. Proteção do Modo EXEC Privilegiado**
-```
-enable secret cisco123
-```
-
-**4. Proteção da Porta de Consola**
-```
-line console 0
-password cisco
-login
-logging synchronous
-exec-timeout 5 0
+vlan 10
+ name Estudantes
+vlan 20
+ name Professores
+vlan 30
 exit
 ```
 
-**5. Encriptação geral de palavras-passe em texto limpo**
-```
-service password-encryption
-```
+---
 
-> Repetir estes comandos básicos ajustando apenas o `hostname` em cada switch: `SW-00`, `SW-01`, `SW-02`.
+### » Tópico 2 — Portas de acesso e trunk
+
+<details>
+<summary><strong>Switch0</strong> — PC0, PC1, PC2 + trunk para Switch2</summary>
+
+```bash
+Switch0(config)# interface fastEthernet 0/1
+Switch0(config-if)# switchport mode access
+Switch0(config-if)# switchport access vlan 10
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
+
+Switch0(config)# interface fastEthernet 0/2
+Switch0(config-if)# switchport mode access
+Switch0(config-if)# switchport access vlan 20
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
+
+Switch0(config)# interface fastEthernet 0/3
+Switch0(config-if)# switchport mode access
+Switch0(config-if)# switchport access vlan 30
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
+
+Switch0(config)# interface fastEthernet 0/24
+Switch0(config-if)# switchport mode trunk
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
+```
+</details>
+
+<details>
+<summary><strong>Switch1</strong> — PC3, PC4, PC5 + trunk para Switch2</summary>
+
+```bash
+Switch1(config)# interface fastEthernet 0/1
+Switch1(config-if)# switchport mode access
+Switch1(config-if)# switchport access vlan 30
+Switch1(config-if)# no shutdown
+Switch1(config-if)# exit
+
+Switch1(config)# interface fastEthernet 0/2
+Switch1(config-if)# switchport mode access
+Switch1(config-if)# switchport access vlan 20
+Switch1(config-if)# no shutdown
+Switch1(config-if)# exit
+
+Switch1(config)# interface fastEthernet 0/3
+Switch1(config-if)# switchport mode access
+Switch1(config-if)# switchport access vlan 10
+Switch1(config-if)# no shutdown
+Switch1(config-if)# exit
+
+Switch1(config)# interface fastEthernet 0/24
+Switch1(config-if)# switchport mode trunk
+Switch1(config-if)# no shutdown
+Switch1(config-if)# exit
+```
+</details>
+
+<details>
+<summary><strong>Switch2</strong> — trunks para Switch0, Switch1 e Router0</summary>
+
+```bash
+Switch2(config)# interface fastEthernet 0/1
+Switch2(config-if)# switchport mode trunk
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+
+Switch2(config)# interface fastEthernet 0/2
+Switch2(config-if)# switchport mode trunk
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+
+Switch2(config)# interface fastEthernet 0/3
+Switch2(config-if)# switchport mode trunk
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+```
+</details>
 
 ---
 
-### TÓPICO 2: Configuração de VLANs e Modos de Interface (Acesso e Tronco)
+### » Tópico 3 — Router-on-a-Stick (`Router0`)
 
-#### Explicação Técnica
-
-As VLANs segmentam o domínio de broadcast na Camada 2.
-
-- **Portas de Acesso** (`switchport mode access`): conectam dispositivos finais (PCs, Servidores) e transportam tráfego de apenas uma VLAN, sem etiquetas (*untagged*).
-- **Portas Tronco** (`switchport mode trunk`): interconectam switches e routers, transportando o tráfego de múltiplas VLANs através da etiqueta IEEE 802.1Q.
-
-#### 1. No Switch Principal (SW-00) — Criar VLANs e Ativar Troncos
+> **Explicação técnica:** uma única interface física do router (`Gi0/0`) liga a uma porta trunk do switch e é dividida em **sub-interfaces lógicas**, uma por VLAN, cada uma com `encapsulation dot1Q <vlan>` e o respetivo IP de gateway.
 
 ```bash
-SW-00(config)# vlan 10
-SW-00(config-vlan)# name Estudantes
-SW-00(config-vlan)# vlan 20
-SW-00(config-vlan)# name Professores
-SW-00(config-vlan)# vlan 30
-SW-00(config-vlan)# name Servidores
-SW-00(config-vlan)# vlan 99
-SW-00(config-vlan)# name Gestao
-SW-00(config-vlan)# exit
+Router0> enable
+Router0# configure terminal
+
+Router0(config)# interface gigabitEthernet 0/0
+Router0(config-if)# no shutdown
+Router0(config-if)# exit
 ```
 
-**Configurar a porta ligada ao Router-01 como Trunk**
-```
-SW-00(config)# interface fastEthernet 0/1
-SW-00(config-if)# switchport mode trunk
-SW-00(config-if)# no shutdown
-SW-00(config-if)# exit
-```
-
-**Configurar a porta do Servidor DHCP (SRV-DHCP) na VLAN 30**
-```
-SW-00(config)# interface fastEthernet 0/2
-SW-00(config-if)# switchport mode access
-SW-00(config-if)# switchport access vlan 30
-SW-00(config-if)# no shutdown
-SW-00(config-if)# exit
-```
-
-**Configurar as ligações com SW-01 e SW-02 como Trunk**
-```
-SW-00(config)# interface range fastEthernet 0/3 - 4
-SW-00(config-if)# switchport mode trunk
-SW-00(config-if)# no shutdown
-SW-00(config-if)# exit
-```
-
-#### 2. No Switch de Acesso SW-01
-
+**VLAN 10 (Estudantes)**
 ```bash
-SW-01(config)# vlan 10
-SW-01(config-vlan)# name Estudantes
-SW-01(config-vlan)# vlan 20
-SW-01(config-vlan)# name Professores
-SW-01(config-vlan)# vlan 30
-SW-01(config-vlan)# name Servidores
-SW-01(config-vlan)# vlan 99
-SW-01(config-vlan)# name Gestao
-SW-01(config-vlan)# exit
+Router0(config)# interface gigabitEthernet 0/0.10
+Router0(config-subif)# encapsulation dot1Q 10
+Router0(config-subif)# ip address 192.168.10.1 255.255.255.0
+Router0(config-subif)# exit
 ```
 
-**Trunk na porta Fa0/1 (ligada ao SW-00)**
-```
-SW-01(config)# interface fastEthernet 0/1
-SW-01(config-if)# switchport mode trunk
-SW-01(config-if)# no shutdown
-SW-01(config-if)# exit
-```
-
-**Porta do PC1 (VLAN 10)**
-```
-SW-01(config)# interface fastEthernet 0/2
-SW-01(config-if)# switchport mode access
-SW-01(config-if)# switchport access vlan 10
-SW-01(config-if)# no shutdown
-SW-01(config-if)# exit
-```
-
-**Porta do PC2 (VLAN 20)**
-```
-SW-01(config)# interface fastEthernet 0/3
-SW-01(config-if)# switchport mode access
-SW-01(config-if)# switchport access vlan 20
-SW-01(config-if)# no shutdown
-SW-01(config-if)# exit
-```
-
-#### 3. No Switch de Acesso SW-02
-
-> **Correção:** na versão original, todo este bloco (VLANs e trunk) usava por engano o prompt `SW-01(...)`, copiado do switch anterior. Abaixo está corrigido para `SW-02(...)`.
-
+**VLAN 20 (Professores)**
 ```bash
-SW-02(config)# vlan 10
-SW-02(config-vlan)# name Estudantes
-SW-02(config-vlan)# vlan 20
-SW-02(config-vlan)# name Professores
-SW-02(config-vlan)# vlan 30
-SW-02(config-vlan)# name Servidores
-SW-02(config-vlan)# vlan 99
-SW-02(config-vlan)# name Gestao
-SW-02(config-vlan)# exit
+Router0(config)# interface gigabitEthernet 0/0.20
+Router0(config-subif)# encapsulation dot1Q 20
+Router0(config-subif)# ip address 192.168.20.1 255.255.255.0
+Router0(config-subif)# exit
 ```
 
-**Trunk na porta Fa0/1 (ligada ao SW-00)**
-```
-SW-02(config)# interface fastEthernet 0/1
-SW-02(config-if)# switchport mode trunk
-SW-02(config-if)# no shutdown
-SW-02(config-if)# exit
-```
-
-**Porta do PC3 (VLAN 10)**
-```
-SW-02(config)# interface fastEthernet 0/2
-SW-02(config-if)# switchport mode access
-SW-02(config-if)# switchport access vlan 10
-SW-02(config-if)# no shutdown
-SW-02(config-if)# exit
+**VLAN 30**
+```bash
+Router0(config)# interface gigabitEthernet 0/0.30
+Router0(config-subif)# encapsulation dot1Q 30
+Router0(config-subif)# ip address 192.168.30.1 255.255.255.0
+Router0(config-subif)# exit
 ```
 
-**Porta do PC4 (VLAN 20)**
-```
-SW-02(config)# interface fastEthernet 0/3
-SW-02(config-if)# switchport mode access
-SW-02(config-if)# switchport access vlan 20
-SW-02(config-if)# no shutdown
-SW-02(config-if)# exit
-```
-
-**Porta do PC5 (VLAN 30)**
-```
-SW-02(config)# interface fastEthernet 0/4
-SW-02(config-if)# switchport mode access
-SW-02(config-if)# switchport access vlan 30
-SW-02(config-if)# no shutdown
-SW-02(config-if)# exit
-```
+> 📌 A interface física `Gi0/0` **não** recebe IP quando se usam sub-interfaces — só precisa de `no shutdown`. Repara que **não existe** `Gi0/0.999`: a VLAN de gestão fica fora do routing de propósito.
 
 ---
 
-### TÓPICO 3: Configuração de Interfaces Virtuais de Switch (SVI) e Default Gateway
+### » Tópico 4 — Atribuir IP e gateway aos PCs
 
-#### Explicação Técnica
-
-Uma **SVI** (*Switch Virtual Interface*) é uma interface lógica de Camada 3 configurada dentro do switch que permite atribuir um endereço IP para gestão remota. Como o switch opera na Camada 2, precisa de um *Default Gateway* para responder a pacotes vindos de sub-redes/VLANs diferentes da sua SVI.
-
-> **Correção crítica:** na versão original, os três switches (SW-00, SW-01, SW-02) usavam o mesmo prompt (`SW-00`) e o mesmo IP (`192.168.10.162`), o que causaria **conflito de IP** na VLAN 99. Cada switch tem agora o seu próprio prompt e IP, conforme a tabela do Tópico 1.
-
-**SW-00**
-```bash
-SW-00(config)# interface vlan 99
-SW-00(config-if)# description Interface_Gestao_SW0
-SW-00(config-if)# ip address 192.168.10.162 255.255.255.224
-SW-00(config-if)# no shutdown
-SW-00(config-if)# exit
-SW-00(config)# ip default-gateway 192.168.10.161
-```
-
-**SW-01**
-```bash
-SW-01(config)# interface vlan 99
-SW-01(config-if)# description Interface_Gestao_SW1
-SW-01(config-if)# ip address 192.168.10.163 255.255.255.224
-SW-01(config-if)# no shutdown
-SW-01(config-if)# exit
-SW-01(config)# ip default-gateway 192.168.10.161
-```
-
-**SW-02**
-```bash
-SW-02(config)# interface vlan 99
-SW-02(config-if)# description Interface_Gestao_SW2
-SW-02(config-if)# ip address 192.168.10.164 255.255.255.224
-SW-02(config-if)# no shutdown
-SW-02(config-if)# exit
-SW-02(config)# ip default-gateway 192.168.10.161
-```
-
-> SVI do `SW-00`: `192.168.10.162/27` | SVI do `SW-01`: `192.168.10.163/27` | SVI do `SW-02`: `192.168.10.164/27` | Gateway comum: `192.168.10.161`
+Em cada PC: `Desktop → IP Configuration → Static`, com IP, máscara e **Default Gateway** conforme a tabela da secção 1.
 
 ---
 
-### TÓPICO 4: Roteamento Inter-VLAN via Router-on-a-Stick (ROAS)
+### » Tópico 5 — Testes de ping (resultado atualizado com o router)
 
-#### Explicação Técnica
+| Teste | PCs | Mesma VLAN? | Antes do router | **Agora** (com `Router0`) |
+|:---:|---|:---:|:---:|:---:|
+| a | `PC5` ↔ `PC0` | Sim (VLAN10) | ✅ Sucesso | ✅ Sucesso *(sem alteração)* |
+| b | `PC1` ↔ `PC5` | Não (VLAN20 ↔ VLAN10) | ❌ Falha | ✅ **Sucesso** *(agora rotado pelo Router0)* |
+| c | `PC2` ↔ `PC3` | Sim (VLAN30) | ✅ Sucesso | ✅ Sucesso *(sem alteração)* |
 
-O tráfego intra-VLAN ocorre diretamente no switch (Camada 2). Para permitir a comunicação inter-VLAN, utiliza-se a técnica **ROAS** (*Router-on-a-Stick*), onde uma única porta física do router (`Gi0/0`) é conectada a uma porta tronco do switch. A interface física é dividida em sub-interfaces lógicas, cada uma associada à sua VLAN através do enquadramento `encapsulation dot1Q`.
+> ✅ **Resumo:** os pings intra-VLAN (a, c) continuam a funcionar por Camada 2. O ping inter-VLAN (b) passa a funcionar porque o `Router0` recebe o pacote em `Gi0/0.20`, consulta a tabela de routing e reencaminha-o por `Gi0/0.10`.
+
+---
+
+### » Tópico 6 — VLAN 999 "gestão" e acesso SSH
+
+Repetir em `Switch0`, `Switch1` e `Switch2`, mudando apenas o IP:
 
 ```bash
-Router-01(config)# interface gigabitEthernet 0/0
-Router-01(config-if)# description Link_Tronco_ROAS_SW-00
-Router-01(config-if)# no shutdown
-Router-01(config-if)# exit
+Switch0(config)# vlan 999
+Switch0(config-vlan)# name gestao
+Switch0(config-vlan)# exit
+
+Switch0(config)# interface vlan 999
+Switch0(config-if)# ip address 10.0.0.1 255.0.0.0
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
+```
+```bash
+Switch1(config)# vlan 999
+Switch1(config-vlan)# name gestao
+Switch1(config-vlan)# exit
+
+Switch1(config)# interface vlan 999
+Switch1(config-if)# ip address 10.0.0.2 255.0.0.0
+Switch1(config-if)# no shutdown
+Switch1(config-if)# exit
+```
+```bash
+Switch2(config)# vlan 999
+Switch2(config-vlan)# name gestao
+Switch2(config-vlan)# exit
+
+Switch2(config)# interface vlan 999
+Switch2(config-if)# ip address 10.0.0.3 255.0.0.0
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
 ```
 
-**Sub-interface VLAN 10 (Estudantes)**
-```
-Router-01(config)# interface gigabitEthernet 0/0.10
-Router-01(config-subif)# encapsulation dot1Q 10
-Router-01(config-subif)# ip address 192.168.10.1 255.255.255.192
-Router-01(config-subif)# exit
-```
-
-**Sub-interface VLAN 20 (Professores)**
-```
-Router-01(config)# interface gigabitEthernet 0/0.20
-Router-01(config-subif)# encapsulation dot1Q 20
-Router-01(config-subif)# ip address 192.168.10.65 255.255.255.192
-Router-01(config-subif)# exit
-```
-
-**Sub-interface VLAN 30 (Servidores)**
-```
-Router-01(config)# interface gigabitEthernet 0/0.30
-Router-01(config-subif)# encapsulation dot1Q 30
-Router-01(config-subif)# ip address 192.168.10.129 255.255.255.224
-Router-01(config-subif)# exit
-```
-
-**Sub-interface VLAN 99 (Gestão)**
-```
-Router-01(config)# interface gigabitEthernet 0/0.99
-Router-01(config-subif)# encapsulation dot1Q 99
-Router-01(config-subif)# ip address 192.168.10.161 255.255.255.224
-Router-01(config-subif)# exit
+**SSH** (repetir nos três switches):
+```bash
+Switch0(config)# ip domain-name cinel.wan
+Switch0(config)# username admin secret cinel
+Switch0(config)# crypto key generate rsa
+% How many bits in the modulus [512]: 2048
+Switch0(config)# ip ssh version 2
+Switch0(config)# line vty 0 4
+Switch0(config-line)# login local
+Switch0(config-line)# transport input ssh
+Switch0(config-line)# exit
 ```
 
 ---
 
-### TÓPICO 5: Configuração de Serviço DHCP no Servidor Central (SRV-DHCP)
+### » Tópico 7 — PC na Fa0/10 com VLAN 999
 
-#### Explicação Técnica
-
-O protocolo DHCP automatiza a distribuição de IPs pelo ciclo **DORA** (*Discover, Offer, Request, ACK*). Em redes empresariais é comum centralizar as *pools* num Servidor DHCP dedicado.
-
-#### Configuração no Servidor Dedicado SRV-DHCP (Packet Tracer GUI)
-
-1. Clique no `SRV-DHCP` → separador **Desktop** → **IP Configuration**:
-   - IP Address: `192.168.10.130`
-   - Subnet Mask: `255.255.255.224`
-   - Default Gateway: `192.168.10.129`
-
-2. Separador **Services** → **DHCP**:
-   - Ativar o serviço: `Service = On`
-
-   **Pool 1 (VLAN 10 - Estudantes):**
-   - Pool Name: `POOL-Estudantes`
-   - Default Gateway: `192.168.10.1`
-   - DNS Server: `8.8.8.8`
-   - Start IP Address: `192.168.10.10`
-   - Subnet Mask: `255.255.255.192` → clique em **Add**
-
-   **Pool 2 (VLAN 20 - Professores):**
-   - Pool Name: `POOL-Professores`
-   - Default Gateway: `192.168.10.65`
-   - DNS Server: `8.8.8.8`
-   - Start IP Address: `192.168.10.75`
-   - Subnet Mask: `255.255.255.192` → clique em **Add**
-
----
-
-### TÓPICO 6: Configuração do Agente de Retransmissão DHCP (`ip helper-address`)
-
-#### Explicação Técnica
-
-Como as mensagens `DHCPDISCOVER` são enviadas em *broadcast*, os routers bloqueiam a sua passagem entre sub-redes. O comando `ip helper-address` transforma o *broadcast* recebido na interface dos clientes num pacote *unicast* direcionado ao IP do Servidor DHCP Central (`192.168.10.130`).
-
-**Aplicar o agente de retransmissão nas sub-interfaces das VLANs clientes**
-```
-Router-01(config)# interface gigabitEthernet 0/0.10
-Router-01(config-subif)# ip helper-address 192.168.10.130
-Router-01(config-subif)# exit
-```
-
-```
-Router-01(config)# interface gigabitEthernet 0/0.20
-Router-01(config-subif)# ip helper-address 192.168.10.130
-Router-01(config-subif)# exit
-```
-
-> A partir deste momento, quando o PC1 ou PC2 solicitarem IP via DHCP, o Router-01 reencaminhará o pedido para o SRV-DHCP na VLAN 30.
-
----
-
-### TÓPICO 7: Acesso Remoto Seguro (SSH no Router) e Telnet (nos Switches)
-
-#### Explicação Técnica
-
-- **Telnet** (Porta TCP 23): transmite credenciais em texto simples, sem encriptação (configurado nos switches de acesso apenas para fins de teste).
-- **SSH** (Porta TCP 22): cifra o tráfego de gestão utilizando chaves RSA (configurado no Router-01).
-
-**1. SSH no Router (Router-01)**
 ```bash
-Router-01(config)# ip domain-name empresa.local
-Router-01(config)# username admin secret AdminPass123
-Router-01(config)# crypto key generate rsa
-% How many bits in the modulus [512]: 1024
-Router-01(config)# ip ssh version 2
-Router-01(config)# line vty 0 4
-Router-01(config-line)# login local
-Router-01(config-line)# transport input ssh
-Router-01(config-line)# exec-timeout 10 0
-Router-01(config-line)# exit
+Switch0(config)# interface fastEthernet 0/10
+Switch0(config-if)# switchport mode access
+Switch0(config-if)# switchport access vlan 999
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
 ```
 
-**2. Telnet nos Switches (exemplo no SW-01 — repetir no SW-02)**
+| Dispositivo | IP | Máscara |
+|---|---|---|
+| `PC-Gestao` | `10.0.0.10` | `/8` |
+
+---
+
+### » Tópico 8 — Testar o acesso SSH
+
+**Teste 1 — a partir do `PC-Gestao` (VLAN 999):**
 ```bash
-SW-01(config)# line vty 0 15
-SW-01(config-line)# password cisco
-SW-01(config-line)# login
-SW-01(config-line)# transport input telnet
-SW-01(config-line)# exec-timeout 5 0
-SW-01(config-line)# exit
+ssh -l admin 10.0.0.1
+```
+`password: cinel`
+
+> ✅ **Sucesso** — mesma VLAN 999 (propagada pelos trunks) que as SVIs de gestão.
+
+**Teste 2 — a partir de um PC de outra VLAN (ex.: `PC0`, VLAN10):**
+```bash
+ssh -l admin 10.0.0.1
 ```
 
----
-
-## 3. Roteiro de Testes e Validação da Rede
-
-1. **Obtenção Dinâmica de IP (DHCP)**
-   - Abra o `PC1` (VLAN 10) → **Desktop** → **IP Configuration** → selecione `DHCP`.
-   - Confirme se o IP atribuído pertence à gama `192.168.10.10-.62` com Gateway `192.168.10.1`.
-
-2. **Teste de Comunicação Intra-VLAN**
-   - No `PC1`, abra o Prompt de Comando (CMD) e execute:
-     ```bash
-     ping 192.168.10.X
-     ```
-     (IP do PC3, pertencente à mesma VLAN 10)
-
-3. **Teste de Roteamento Inter-VLAN (ROAS)**
-   - No `PC1`, execute o ping para o PC2 (VLAN 20):
-     ```bash
-     ping 192.168.10.75
-     ```
-
-4. **Teste de Acesso Remoto Telnet ao Switch**
-   - No `PC1`, aceda ao switch de acesso via Telnet:
-     ```bash
-     telnet 192.168.10.163
-     ```
-     (Insira a palavra-passe `cisco`)
-
-5. **Teste de Acesso Remoto Seguro SSH ao Router**
-   - No `PC1`, ligue-se ao Router via SSH:
-     ```bash
-     ssh -l admin 192.168.10.1
-     ```
-     (Insira a palavra-passe `AdminPass123`)
+> ❌ **Falha** (`Destination host unreachable`) — mesmo com o `Router0` instalado, porque não existe `Gi0/0.999`; a rede 10.0.0.0/8 continua sem rota a partir das VLANs de utilizador.
 
 ---
 
-## 4. Resumo das Correções Feitas
+# 3. Resumo dos resultados esperados (com Router0 instalado)
 
-| Local | Problema na versão original | Correção |
-|:---:|:---:|:---:|
-| Tópico 2, SW-02 | Prompts usavam `SW-01(...)` em vez de `SW-02(...)` | Prompts corrigidos para `SW-02` |
-| Tópico 3, SVIs | SW-01 e SW-02 repetiam o prompt e o IP do SW-00 (`.162`) | Cada switch com prompt e IP próprios: `.162`, `.163`, `.164` |
-| Seção 1, diagrama | Portas do SW-00 inconsistentes com os comandos (`Gi0/1`/`Gi0/2`/`Fa0/24` vs. `Fa0/1`–`Fa0/4`) | Diagrama alinhado com as portas realmente usadas nos comandos |
-| Seção 1, modelo do Router | Mistura de notação modular (`Gi0/0/0`) com notação fixa (`Gi0/0`) | Fixado o modelo Cisco 2911 e a notação `Gi0/0` |
-| Tópico 7, SSH | `crypto key generate rsa 1024` (sintaxe inválida no IOS) | Separado o comando do prompt de nº de bits (`% How many bits...`) |
+| Ponto do enunciado | Resultado a observar/reportar |
+|---|---|
+| 8a. `PC5` ↔ `PC0` | ✅ Sucesso (mesma VLAN10, via trunk) |
+| 8b. `PC1` ↔ `PC5` | ✅ **Sucesso** agora que existe o `Router0` *(antes falhava)* |
+| 8c. `PC2` ↔ `PC3` | ✅ Sucesso (mesma VLAN30, via trunk) |
+| 12. SSH do PC da VLAN999 | ✅ Sucesso — mesmo domínio L2 da gestão |
+| 13. SSH de um PC de outra VLAN | ❌ Falha — VLAN 999 sem sub-interface no router |
+
+---
+
+# 4. Checklist rápido
+
+- [ ] VLANs 10, 20 e 30 criadas em `Switch0`, `Switch1` e `Switch2`
+- [ ] VLAN10 renomeada para `Estudantes`, VLAN20 para `Professores`
+- [ ] Portas de acesso configuradas (`PC0`–`PC5`) nas VLANs corretas
+- [ ] Trunks: `Switch0↔Switch2`, `Switch1↔Switch2`, `Switch2↔Router0`
+- [ ] `Router0`: sub-interfaces `Gi0/0.10`, `Gi0/0.20`, `Gi0/0.30` com IP de gateway
+- [ ] IP + gateway atribuídos aos 6 PCs
+- [ ] Teste de ping 8a realizado (sucesso esperado)
+- [ ] Teste de ping 8b realizado (sucesso esperado, com router)
+- [ ] Teste de ping 8c realizado (sucesso esperado)
+- [ ] VLAN 999 `gestao` criada e SVI atribuída nos 3 switches
+- [ ] SSH configurado (`domain-name`, `username`, RSA 2048 bits, `line vty`) nos 3 switches
+- [ ] `PC-Gestao` ligado à `Fa0/10`, VLAN999, IP `10.0.0.10`
+- [ ] Teste SSH 12 realizado (sucesso esperado)
+- [ ] Teste SSH 13 realizado (falha esperada)
