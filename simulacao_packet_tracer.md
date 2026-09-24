@@ -95,6 +95,10 @@ exit
 write memory
 ```
 
+**Teste:**
+`show vlan brief`
+
+
 ---
 
 ### » Tópico 2 — Portas de acesso e trunk
