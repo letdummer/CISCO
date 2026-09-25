@@ -141,6 +141,7 @@ Switch0# write memory
 
 **SW-01**
 <details>
+
 **1. Trunk**
 ```
 Switch1(config)# interface fastEthernet 0/24
@@ -177,6 +178,7 @@ Switch1# write memory
 
 **SW-02**
 <Details>
+
 ```
 Switch2(config)# interface fastEthernet 0/24
 Switch2(config-if)# switchport mode trunk
