@@ -39,18 +39,19 @@
 ### » Diagrama
 
 ```
-                                [ Router0 ]
-                                Gi0/0 (trunk / ROAS)
-                                     |
-                     [ Switch0 ]  (central, sem PCs)
-              Fa0/1 |      Fa0/2 |      | Fa0/3
-          (trunk)   |  (trunk)   |      | (trunk, p/ Router0)
-                     |            |
-        [ Switch1 ]---            ---[ Switch2 ]
-     Fa0/1: PC0 (VLAN10)          Fa0/1: PC3 (VLAN30)
-     Fa0/2: PC1 (VLAN20)          Fa0/2: PC4 (VLAN20)
-     Fa0/3: PC2 (VLAN30)          Fa0/3: PC5 (VLAN10)
-     Fa0/24: trunk → Switch2      Fa0/24: trunk → Switch2
+                      [ Router0 ]
+                        (Gi0/0)          -(trunk / ROAS)
+                          |
+                       (Fa0/1) 
+                     [ Switch0 ]         -(central)
+                /                |                  \
+            (Fa0/2)           (Fa0/3)             (Fa0/24)
+              /                  |                    \
+             /                   |                     \
+      [ Switch1 ]           [ Switch2 ]            [ Server-DHCP ] (Fa0)
+   Fa0/1: PC0 (V10)       Fa0/1: PC3 (V30)
+   Fa0/2: PC1 (V20)       Fa0/2: PC4 (V20)
+   Fa0/3: PC2 (V30)       Fa0/3: PC5 (V10)
 ```
 
 ### » VLANs, sub-redes e gateway
@@ -74,6 +75,7 @@
 | `PC4` | 20 | `192.168.20.11` | `/24` | `192.168.20.1` |
 | `PC2` | 30 | `192.168.30.10` | `/24` | `192.168.30.1` |
 | `PC3` | 30 | `192.168.30.11` | `/24` | `192.168.30.1` |
+| `Server-DHCP` | `10` | `192.168.10.254` | `/24` | `192.168.10.1` |
 
 ---
 
@@ -106,7 +108,9 @@ write memory
 ```
 
 **Teste:**
-`show vlan brief`
+```
+show vlan brief
+```
 
 
 ---
@@ -135,6 +139,8 @@ Switch0(config)# exit
 Switch0# write memory
 ```
 
+**SW-01**
+<details>
 **1. Trunk**
 ```
 Switch1(config)# interface fastEthernet 0/24
@@ -166,9 +172,61 @@ Switch1(config-if)# exit
 Switch1(config)# exit
 Switch1# write memory
 ```
+</details>
 
-`REPETIR PARA O SW-2`
 
+**SW-02**
+<Details>
+```
+Switch2(config)# interface fastEthernet 0/24
+Switch2(config-if)# switchport mode trunk
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+```
+
+# Portas de acesso aos PCs no Switch2
+```
+Switch2(config)# interface fastEthernet 0/1
+Switch2(config-if)# switchport mode access
+Switch2(config-if)# switchport access vlan 30
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+```
+
+```
+Switch2(config)# interface fastEthernet 0/2
+Switch2(config-if)# switchport mode access
+Switch2(config-if)# switchport access vlan 20
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+```
+
+```
+Switch2(config)# interface fastEthernet 0/3
+Switch2(config-if)# switchport mode access
+Switch2(config-if)# switchport access vlan 10
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+```
+
+```
+Switch2(config)# exit
+Switch2# write memory
+```
+
+</Details>
+
+**Confirmação de mudanças:**
+
+```
+show interfaces trunk
+```
+
+<!--
+| Port | Mode | Encapsulation | Status | Nativa vlan |
+|:----:|:----:|:-------------:|:------:|:-----------:|
+| `fa0/2` | `on` | `802.1q` | `/trunking` | `1` |
+-->
 
 ---
 
@@ -217,6 +275,24 @@ Router0(config-if)# write memory
 ### » Tópico 4 — Atribuir IP e gateway aos PCs
 
 Em cada PC: `Desktop → IP Configuration → Static`, com IP, máscara e **Default Gateway** conforme a tabela da secção 1.
+
+**Configuração Manual do Server-DHCP**
+
+`Clicar no Server -> Desktop -> Ip Configuration`
+
+| Ip Address | Subnet Mask | Default Gateway |
+|:---:|:---:|:---:|
+| 192.168.10.254 | 255.255.255.0 | 192.168.10.1 |
+
+
+
+
+`Services -> DHCP`
+**ON**
+
+| Default Gateway | Start IP Address | Subnet Mask |
+|:---:|:---:|:---:|
+| 192.168.10.1 | 192.168.10.50 | 255.255.255.0 |
 
 ---
 
@@ -295,7 +371,16 @@ Switch0(config-if)# switchport access vlan 999
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
 Switch0(config-if)# write memory
+```
 
+
+**Configuração do Servidor DHCP no SW-0**
+```
+Switch0(config)# interface fastEthernet 0/24
+Switch0(config-if)# switchport mode access
+Switch0(config-if)# switchport access vlan 10
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
 ```
 
 | Dispositivo | IP | Máscara |
@@ -307,62 +392,55 @@ Switch0(config-if)# write memory
 ### » Tópico 8 — FECHAR PORTAS
 
 **SWITCH 0 (Switch Central):**
-- Portas em uso: Fa0/1, Fa0/2, Fa0/3 (trunks).
-- Portas sem uso para fechar: Fa0/4 até Fa0/24 + Gi0/1 e Gi0/2.
+- Portas em uso: `Fa0/1`, `Fa0/2`, `Fa0/3` (trunks). `Fa0/10` (Pc-Gestao) e `Fa0/24` (server-DHCP)
+- Portas para fechar: `Fa0/4` até `Fa0/9`, `Fa0/11-23`, `Gi0/1-2`.
 
-```
-Switch0> enable
-Switch0# configure terminal
-```
-
-
-! Seleciona o intervalo de portas FastEthernet de 4 a 24 e as portas Gigabit
-```
-Switch0(config)# interface range fastEthernet 0/4 - 24 , gigabitEthernet 0/1 - 2
-Switch0(config-if-range)# shutdown
-Switch0(config-if-range)# exit
-```
-
-**SWITCH 1 e 2 (Switches de Acesso):**
-- Portas em uso: Fa0/1, Fa0/2, Fa0/3 (PCs) e Fa0/24 (trunk).
-
-- Portas sem uso para fechar: Fa0/4 até Fa0/23 + Gi0/1 e Gi0/2.
-(Se tiveres a porta Fa0/10 atribuída à VLAN 999 para o PC-Gestao, lembra-te de não a incluir no range).
-
-```
-Switch1> enable
-Switch1# configure terminal
-```
-
-! Exemplo desativando portas 4 a 9, 11 a 23 e Gigabit:
-```
-Switch1(config)# interface range fastEthernet 0/4 - 9 , fastEthernet 0/11 - 23 , gigabitEthernet 0/1 - 2
-Switch1(config-if-range)# shutdown
-Switch1(config-if-range)# exit
-```
-
-***Mover portas não utilizadas para uma VLAN sem tráfego (Boa Prática de Segurança)***
-
-`Além de dar shutdown, é uma recomendação oficial de hardening da Cisco mover todas as portas não utilizadas para uma VLAN dedicada sem acesso a nada (ex.: VLAN 99 ou VLAN 666 apelidada de Blackhole ou Unused).`
 
 ```
 Switch0(config)# vlan 99
 Switch0(config-vlan)# name Portas_Inativas
 Switch0(config-vlan)# exit
 
-Switch0(config)# interface range fastEthernet 0/4 - 24 , gigabitEthernet 0/1 - 2
+Switch0(config)# interface range fastEthernet 0/4 - 9 , fastEthernet 0/11 - 23 , gigabitEthernet 0/1 - 2
 Switch0(config-if-range)# switchport mode access
 Switch0(config-if-range)# switchport access vlan 99
 Switch0(config-if-range)# shutdown
 Switch0(config-if-range)# exit
+Switch0# write memory
 ```
 
-***Como verificar se as portas ficaram fechadas?***
+
+
+**SWITCH 1 e 2 (Switches de Acesso):**
+- Portas em uso: `Fa0/1`, `Fa0/2`, `Fa0/3` (PCs) e `Fa0/24` (trunk).
+- Portas para fechar: `Fa0/4` até `Fa0/23`, `Gi0/1-2`.
+
+```
+Switch1(config)# vlan 99
+Switch1(config-vlan)# name Portas_Inativas
+Switch1(config-vlan)# exit
+
+Switch1(config)# interface range fastEthernet 0/4 - 23 , gigabitEthernet 0/1 - 2
+Switch1(config-if-range)# switchport mode access
+Switch1(config-if-range)# switchport access vlan 99
+Switch1(config-if-range)# shutdown
+Switch1(config-if-range)# exit
+Switch1# write memory
+```
+
+**`Repetir exatamente estes mesmos comandos no Switch2`**
+
+
+**Como verificar se as portas ficaram fechadas?**
 Usa o comando em modo privilegiado para ver o estado das interfaces:
 
 ``` 
 show ip interface brief
 ```
+
+
+
+
 
 ### — Testar o acesso SSH
 
@@ -400,7 +478,7 @@ ssh -l admin 10.0.0.1
 - [ ] VLANs 10, 20 e 30 criadas em `Switch0`, `Switch1` e `Switch2`
 - [ ] VLAN10 renomeada para `Estudantes`, VLAN20 para `Professores`
 - [ ] Portas de acesso configuradas (`PC0`–`PC5`) nas VLANs corretas
-- [ ] Trunks: `Switch0↔Switch2`, `Switch1↔Switch2`, `Switch2↔Router0`
+- [ ] Trunks: Switch0 ↔ Router0 (Fa0/1 a Gi0/0), Switch0 ↔ Switch1 (Fa0/2 a Fa0/24), Switch0 ↔ Switch2 (Fa0/3 a Fa0/24).
 - [ ] `Router0`: sub-interfaces `Gi0/0.10`, `Gi0/0.20`, `Gi0/0.30` com IP de gateway
 - [ ] IP + gateway atribuídos aos 6 PCs
 - [ ] Teste de ping 8a realizado (sucesso esperado)
