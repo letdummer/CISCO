@@ -44,11 +44,11 @@
                           |
                        (Fa0/1) 
                      [ Switch0 ]         -(central)
-                /                |                  \
-            (Fa0/2)           (Fa0/3)             (Fa0/24)
-              /                  |                    \
-             /                   |                     \
-      [ Switch1 ]           [ Switch2 ]            [ Server-DHCP ] (Fa0)
+                /                |                \                 \
+            (Fa0/2)           (Fa0/3)           (Fa0/24)          (Fa0/10)
+              /                  |                  \           [ Pc-Gestao ] 
+             /                   |                   \
+      [ Switch1 ]           [ Switch2 ]        [ Server-DHCP ] (Fa0)
    Fa0/1: PC0 (V10)       Fa0/1: PC3 (V30)
    Fa0/2: PC1 (V20)       Fa0/2: PC4 (V20)
    Fa0/3: PC2 (V30)       Fa0/3: PC5 (V10)
