@@ -372,7 +372,6 @@ Switch0(config-if)# switchport mode access
 Switch0(config-if)# switchport access vlan 999
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
-Switch0(config-if)# write memory
 ```
 
 
@@ -383,6 +382,8 @@ Switch0(config-if)# switchport mode access
 Switch0(config-if)# switchport access vlan 10
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
+Switch0# exit
+Switch0# write memory
 ```
 
 | Dispositivo | IP | Máscara |
