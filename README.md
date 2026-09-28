@@ -181,15 +181,18 @@ SW1(config-vlan)# exit
 ```
 
 **2. Atribuir Portas em Modo de Acesso (Access Port)**
+Usada para configurar terminais, impressoras etc.
 
+**! Associar a interface FastEthernet 0/1 à VLAN 10**
 ```
-! Associar a interface FastEthernet 0/1 à VLAN 10
 SW1(config)# interface fastEthernet 0/1
 SW1(config-if)# switchport mode access
 SW1(config-if)# switchport access vlan 10
 SW1(config-if)# exit
+```
 
-! Associar a interface FastEthernet 0/2 à VLAN 20
+**! Associar a interface FastEthernet 0/2 à VLAN 20**
+```
 SW1(config)# interface fastEthernet 0/2
 SW1(config-if)# switchport mode access
 SW1(config-if)# switchport access vlan 20
@@ -198,15 +201,21 @@ SW1(config-if)# exit
 
 **3. Configurar Porta em Modo Tronco (Trunk Port)**
 
+
+**! Configurar a porta GigabitEthernet 0/1 (ligada a outro switch ou router)**
 ```
-! Configurar a porta GigabitEthernet 0/1 (ligada a outro switch ou router)
 SW1(config)# interface gigabitEthernet 0/1
 SW1(config-if)# switchport mode trunk
-SW1(config-if)# switchport trunk allowed vlan 10,20
+SW1(config-if)# switchport trunk native vlan 40 => modifica a VLAN nativa da VLAN 1 para outra vlan desejada.
+SW1(config-if)# switchport trunk allowed vlan 10,20,30,99  => especifica quais vlans estão autorizadas para esta conexão
 SW1(config-if)# exit
 ```
 
-> Verificação: `show vlan brief` e `show interfaces trunk`.
+> Verificação: `show vlan brief`
+> `show interfaces vlan 20`
+> `show interfaces trunk`
+> `show vlan name student`
+> `show vlan summary`
 
 ---
 
@@ -218,20 +227,24 @@ Os switches de Camada 2 operam apenas no encaminhamento de quadros por endereço
 
 ### Passo a Passo de Configuração
 
+**! 1. Entrar na interface virtual da VLAN de gestão**
 ```
-SW1# configure terminal
+SW1(config)# interface vlan 99 (ou 40)
+```
 
-! 1. Entrar na interface virtual da VLAN de gestão
-SW1(config)# interface vlan 1
-
-! 2. Atribuir o endereço IP e a máscara de sub-rede
+**! 2. Atribuir o endereço IP e a máscara de sub-rede**
+```
 SW1(config-if)# ip address 192.168.10.2 255.255.255.0
+```
 
-! 3. Ativar a interface virtual
+**! 3. Ativar a interface virtual**
+```
 SW1(config-if)# no shutdown
 SW1(config-if)# exit
+```
 
-! 4. Configurar o Gateway Padrão para acesso a partir de outras sub-redes
+**! 4. Configurar o Gateway Padrão para acesso a partir de outras sub-redes**
+```
 SW1(config)# ip default-gateway 192.168.10.1
 SW1(config)# exit
 ```
@@ -270,22 +283,28 @@ SW1(config-if)# exit
 
 **2. No Router: Configurar as Sub-interfaces e Encapsulamento dot1Q**
 
-```
-R1# configure terminal
 
-! Ativar a interface física principal (não atribuir IP direto à porta física)
+**! Ativar a interface física principal (não atribuir IP direto à porta física)**
+```
 R1(config)# interface gigabitEthernet 0/0/0
 R1(config-if)# no shutdown
 R1(config-if)# exit
+```
 
-! --- Sub-interface para a VLAN 10 ---
+> Sintaxe:
+> número da interface física (ponto) número da subinterface
+
+**! --- Sub-interface para a VLAN 10 ---**
+```
 R1(config)# interface gigabitEthernet 0/0/0.10
 R1(config-subif)# description Gateway_VLAN_Vendas
 R1(config-subif)# encapsulation dot1Q 10
 R1(config-subif)# ip address 192.168.10.1 255.255.255.0
 R1(config-subif)# exit
+```
 
-! --- Sub-interface para a VLAN 20 ---
+**! --- Sub-interface para a VLAN 20 ---**
+```
 R1(config)# interface gigabitEthernet 0/0/0.20
 R1(config-subif)# description Gateway_VLAN_Engenharia
 R1(config-subif)# encapsulation dot1Q 20
@@ -310,22 +329,27 @@ No Cisco IOS, deve-se primeiro **excluir os endereços IP estáticos** (usados e
 
 ### Passo a Passo de Configuração
 
-```
-R1# configure terminal
 
-! 1. Excluir os endereços estáticos reservados para infraestrutura
+**1. Excluir os endereços estáticos reservados para infraestrutura**
+```
 R1(config)# ip dhcp excluded-address 192.168.10.1 192.168.10.10
 R1(config)# ip dhcp excluded-address 192.168.20.1 192.168.20.10
+```
 
-! 2. Criar a Pool DHCP para a VLAN 10
+**! 2. Criar a Pool DHCP para a VLAN 10**
+```
 R1(config)# ip dhcp pool POOL-VENDAS
 R1(dhcp-config)# network 192.168.10.0 255.255.255.0
 R1(dhcp-config)# default-router 192.168.10.1
 R1(dhcp-config)# dns-server 8.8.8.8
 R1(dhcp-config)# domain-name empresa.local
 R1(dhcp-config)# exit
+```
 
-! 3. Criar a Pool DHCP para a VLAN 20
+**OBS.:** Se for configurar no Router em vez de no Servidor, basta não configurar a linha "domain-name". 
+
+**! 3. Criar a Pool DHCP para a VLAN 20**
+```
 R1(config)# ip dhcp pool POOL-ENGENHARIA
 R1(dhcp-config)# network 192.168.20.0 255.255.255.0
 R1(dhcp-config)# default-router 192.168.20.1
@@ -333,7 +357,10 @@ R1(dhcp-config)# dns-server 8.8.8.8
 R1(dhcp-config)# exit
 ```
 
-> Comandos de verificação: `show ip dhcp binding` e `show ip dhcp server statistics`.
+> Comandos de verificação:
+> `show ip dhcp binding`
+> `show ip dhcp server statistics`
+> `show running-config | section dhcp`
 
 ---
 
@@ -359,17 +386,20 @@ O **Agente de Retransmissão (DHCP Relay Agent)** resolve este problema: configu
 
 ### Passo a Passo de Configuração
 
+
+**! Entrar na `interface/sub-interface` ligada à LAN de clientes que precisam de DHCP**
 ```
-R1# configure terminal
-
-! Entrar na interface/sub-interface ligada à LAN de clientes que precisam de DHCP
 R1(config)# interface gigabitEthernet 0/0/0.10
+```
 
-! Configurar o IP do Servidor DHCP Central para onde os pedidos devem ser redirecionados
+**! Configurar o `IP do Servidor DHCP` Central para onde os pedidos devem ser redirecionados**
+```
 R1(config-subif)# ip helper-address 10.1.1.2
 R1(config-subif)# exit
+```
 
-! Repetir o processo para outras interfaces que necessitem de retransmissão
+**! `Repetir o processo para outras interfaces` que necessitem de retransmissão**
+```
 R1(config)# interface gigabitEthernet 0/0/0.20
 R1(config-subif)# ip helper-address 10.1.1.2
 R1(config-subif)# exit
