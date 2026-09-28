@@ -4,7 +4,7 @@
 
 1. [Topologia e Endereçamento](#1-topologia-e-endereçamento)
 2. [Passo a Passo no Cisco IOS](#2-passo-a-passo-no-cisco-ios)
-   - [Tópico 1 — Criar VLANs](#-tópico-1--criar-vlans)
+   - [Tópico 1 — Criar VLANs e VTP](#-tópico-1--criar-vlans-e-vtp)
    - [Tópico 2 — Portas de acesso e trunk](#-tópico-2--portas-de-acesso-e-trunk)
    - [Tópico 3 — Router-on-a-Stick e DHCP-Relay](#-tópico-3--router-on-a-stick-e-dhcp-relay)
    - [Tópico 4 — Configuração do DHCP e Pools](#-tópico-4--configuração-do-server-dhcp-e-pools)
@@ -62,43 +62,41 @@
 
 ### » Endereços IP dos PCs
 
-| PC | VLAN | Método | Máscara | Gateway |
+| PC | VLAN | Método | Endereço IP | Máscara | Gateway |
 |---|:---:|---|---|---|
-| `PC0` | 10 | `DHCP` | `/24` | `192.168.10.1` |
-| `PC5` | 10 | `DHCP`  | `/24` | `192.168.10.1` |
-| `PC1` | 20 | `DHCP`  | `/24` | `192.168.20.1` |
-| `PC4` | 20 | `DHCP`  | `/24` | `192.168.20.1` |
-| `PC2` | 30 | `DHCP` | `/24` | `192.168.30.1` |
-| `PC3` | 30 | `DHCP`  | `/24` | `192.168.30.1` |
-| `Server-DHCP` | `10` | `DHCP`  | `/24` | `192.168.10.1` |
+| `PC0` | 10 | `DHCP` | `192.168.10.x` | `/24` | `192.168.10.1` |
+| `PC5` | 10 | `DHCP`  | `192.168.10.x` | `/24` | `192.168.10.1` |
+| `PC1` | 20 | `DHCP`  | `192.168.20.x` | `/24` | `192.168.20.1` |
+| `PC4` | 20 | `DHCP`  | `192.168.20.x` | `/24` | `192.168.20.1` |
+| `PC2` | 30 | `DHCP` | `192.168.30.x` | `/24` | `192.168.30.1` |
+| `PC3` | 30 | `DHCP`  | `192.168.30.x` | `/24` | `192.168.30.1` |
+| `Server-DHCP` | `10` | `DHCP`  | `192.168.10.254` | `/24` | `192.168.10.1` |
 | `PC-Gestao` | `999` | `Estático` | `/8` | `sem gateway` |
 
 ---
 
 # 2. Passo a Passo no Cisco IOS
 
-## » Tópico 1 — Criar VLANs
+## » Tópico 1 — Criar VLANs e VTP
 
 
-### Criar VLANs com VTP : 
-Caso escolha utilizar VTP, deve `configurar o TRUNK` primeiro para que os switchs recebam a tabela de VLANs.
-
+### Opção A: Distribuição Automática via VTP
+⚠️ Atenção: Se optares por VTP, deves configurar primeiro os links Trunk (Tópico 2) entre os switches antes de criar as VLANs no VTP Server.
 ---> [Configuração Trunk](#-tópico-2--portas-de-acesso-e-trunk)
   
 <details>
-   
+
+
+**1. Configurar o VTP Server (Switch0):**   
 ```
 Switch0> enable
 Switch0# configure terminal
-Switch0(config)# vTP domain cinel-domain
+Switch0(config)# vtp domain cinel-domain
 Switch0(config)# vtp mode server
-   
-! (Opcional, mas boa prática):
 Switch0(config)# vtp password cinel
-
 ```
 
-> **Criar todas as VLANS apenas no `Switch0`**
+> **Criar todas as VLANS, apenas no `Switch0`**
 
 ```bash
 enable
@@ -117,14 +115,13 @@ exit
 write memory
 ```
 
-### Configurar Cliente VTP no SW1 e SW2:
+**2. Configurar os VTP Clients (Switch1 e Switch2):**
 
 ```
 Switch1> enable
 Switch1# configure terminal
 Switch1(config)# vtp domain cinel-domain
 Switch1(config)# vtp mode client
-! Se definiste password no Server:
 Switch1(config)# vtp password cinel
 Switch1(config)# exit
 Switch1# write memory
@@ -134,11 +131,14 @@ Switch1# write memory
 ### Confirmar funcionamento do VTP
 
 `show vtp status`
+`show vlan brief`
 
 </details>
 
 
-### Criar VLANs sem vtp:
+### Opção B: Criação Manual de VLANs
+
+Configurar em `Switch0`, `Switch1` e `Switch2`:
 
 ```bash
 enable
@@ -149,11 +149,14 @@ vlan 20
  name Professores
 vlan 30
  name Direcao
+vlan 999
+ name Gestao
+vlan 99
+ name Portas_Inativas
 exit
 write memory
 ```
 
-Repetir em `Switch0`, `Switch1` e `Switch2`:
 
 <details>
 
@@ -182,32 +185,24 @@ show vlan brief
 
 ## » Tópico 2 — Portas de acesso e trunk
 
-<summary><strong>Switch0</strong> — Central (Trunks para Switch1, Switch2 e Router0)</summary>
+**Switch Central (Switch0)**
+
+Trunk para o Router0 (Fa0/1), Switch1 (Fa0/2) e Switch2 (Fa0/3)
 
 ```bash
-Switch0(config)# interface fastEthernet 0/1
-Switch0(config-if)# switchport mode trunk
-Switch0(config-if)# no shutdown
-Switch0(config-if)# exit
-
-Switch0(config)# interface fastEthernet 0/2
-Switch0(config-if)# switchport mode trunk
-Switch0(config-if)# no shutdown
-Switch0(config-if)# exit
-
-Switch0(config)# interface fastEthernet 0/3
-Switch0(config-if)# switchport mode trunk
-Switch0(config-if)# no shutdown
-Switch0(config-if)# exit
-
-Switch0(config)# exit
+Switch0(config)# interface range fastEthernet 0/1-3
+Switch0(config-if-range)# switchport mode trunk
+Switch0(config-if-range)# no shutdown
+Switch0(config-if-range)# exit
 Switch0# write memory
 ```
 
-**SW-01**
+
+**Switch de Acesso (SW-01)**
 <details>
 
-**1. Trunk**
+Trunk
+
 ```
 Switch1(config)# interface fastEthernet 0/24
 Switch1(config-if)# switchport mode trunk
@@ -215,7 +210,8 @@ Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
 ```
 
-**2. Portas de acesso aos PCs**
+Portas de acesso aos PCs
+
 ```
 Switch1(config)# interface fastEthernet 0/1
 Switch1(config-if)# switchport mode access
@@ -241,8 +237,10 @@ Switch1# write memory
 </details>
 
 
-**SW-02**
+**Switch de Acesso (SW-02)**
 <Details>
+
+Trunk para o SW0
 
 ```
 Switch2(config)# interface fastEthernet 0/24
@@ -299,7 +297,7 @@ show interfaces trunk
 
 ## » Tópico 3 — Router-on-a-Stick e DHCP-Relay
 
-> **Explicação técnica:** Uma única interface física do router (Gi0/0) liga ao switch em trunk e divide-se em sub-interfaces lógicas. Como o Server-DHCP se encontra na VLAN 10, adicionamos o comando `ip helper-address 192.168.10.254` nas sub-interfaces das VLANs 20 e 30. Este comando transforma os broadcasts DHCP das VLANs 20 e 30 em pacotes Unicast reencaminhados diretamente ao servidor DHCP.
+> Mecanismo do DHCP Relay: Como o Server-DHCP se encontra fisicamente na VLAN 10, os pedidos de DHCP (broadcasts) emitidos pelas VLANs 20 e 30 são descartados pelo router por omissão. O comando ip helper-address 192.168.10.254 converte esses broadcasts em mensagens unicast direcionadas diretamente ao IP do servidor.
 
 ```bash
 Router0> enable
@@ -314,7 +312,9 @@ Router0(config-if)# exit
 ```bash
 Router0(config)# interface gigabitEthernet 0/0.10
 Router0(config-subif)# encapsulation dot1Q 10
+
 Router0(config-subif)# ip address 192.168.10.1 255.255.255.0
+
 Router0(config-subif)# exit
 ```
 
@@ -322,7 +322,9 @@ Router0(config-subif)# exit
 ```bash
 Router0(config)# interface gigabitEthernet 0/0.20
 Router0(config-subif)# encapsulation dot1Q 20
+
 Router0(config-subif)# ip address 192.168.20.1 255.255.255.0
+
 Router0(config-subif)# ip helper-address 192.168.10.254
 Router0(config-subif)# exit
 ```
@@ -331,10 +333,13 @@ Router0(config-subif)# exit
 ```bash
 Router0(config)# interface gigabitEthernet 0/0.30
 Router0(config-subif)# encapsulation dot1Q 30
+
 Router0(config-subif)# ip address 192.168.30.1 255.255.255.0
+
 Router0(config-subif)# ip helper-address 192.168.10.254
 Router0(config-subif)# exit
-Router0(config-if)# write memory
+Router0(config)# exit
+Router0# write memory
 ```
 
 > 📌 A interface física `Gi0/0` **não** recebe IP quando se usam sub-interfaces — só precisa de `no shutdown`. Repara que **não existe** `Gi0/0.999`: a VLAN de gestão fica fora do routing de propósito.
@@ -343,7 +348,7 @@ Router0(config-if)# write memory
 
 ## » Tópico 4 — Configuração do Server-DHCP e Pools
 
-**Configuração Manual do Server-DHCP**
+**Configuração Manual do Server-DHCP | IP Estático**
 
 `Clicar no Server -> Desktop -> Ip Configuration`
 
@@ -364,7 +369,7 @@ Router0(config-if)# write memory
 
 Em cada PC, [ 0 - 5 ]
 `Desktop - > IP Configuration`
-`DHCP`
+ativar `DHCP`
 
 
 
@@ -372,13 +377,16 @@ Em cada PC, [ 0 - 5 ]
 
 ## » Tópico 5 — VLAN 999 e SSH
 
-Repetir em `Switch0`, `Switch1` e `Switch2`, mudando apenas o IP:
-
+> Se não utilizou VTP, configure a VLAN 999:
 ```bash
 Switch0(config)# vlan 999
 Switch0(config-vlan)# name Gestao
 Switch0(config-vlan)# exit
+```
 
+**1. Endereçamento das interfaces virtuais (SVI) nos Switches:**
+
+```
 Switch0(config)# interface vlan 999
 Switch0(config-if)# ip address 10.0.0.1 255.0.0.0
 Switch0(config-if)# no shutdown
@@ -386,11 +394,12 @@ Switch0(config-if)# exit
 Switch0# write memory
 ```
 
-```bash
-Switch1(config)# vlan 999
-Switch1(config-vlan)# name Gestao
-Switch1(config-vlan)# exit
+> Repetir em `Switch0`, `Switch1` e `Switch2`, mudando apenas o IP (pode acrescentar +1 ao ultimo digito).
+> Criar a VLAN 999 em cada switch, se necessário.
 
+<details>
+   
+```
 Switch1(config)# interface vlan 999
 Switch1(config-if)# ip address 10.0.0.2 255.0.0.0
 Switch1(config-if)# no shutdown
@@ -398,46 +407,81 @@ Switch1(config-if)# exit
 Switch1# write memory
 ```
 
-
-```bash
-Switch2(config)# vlan 999
-Switch2(config-vlan)# name Gestao
-Switch2(config-vlan)# exit
-
+```
 Switch2(config)# interface vlan 999
 Switch2(config-if)# ip address 10.0.0.3 255.0.0.0
 Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
 Switch2# write memory
 ```
+</details>
 
-**SSH** (repetir nos três switches):
+### SSH / TELNET (repetir nos três switches e no Router):
+
 ```bash
-Switch0(config)# ip domain-name cinel.wan
-Switch0(config)# username admin secret cinel
-Switch0(config)# crypto key generate rsa
-% How many bits in the modulus [512]: 2048
-Switch0(config)# ip ssh version 2
-Switch0(config)# line vty 0 4
-Switch0(config-line)# login local
-Switch0(config-line)# transport input ssh
-Switch0(config-line)# exit
+enable
+configure terminal
+
+! 1. Domínio e Chave RSA para SSH:
+
+ip domain-name cinel.local
+crypto key generate rsa
+2048
+
+! 2. Autenticação Local e Modo Privilegiado:
+
+enable secret cinel
+username admin privilege 15 secret cinel
+
+! 3. Hardening Geral:
+
+service password-encryption
+banner motd # Acesso restrito! #
+
+! 4. Proteção da Porta de Consola:
+
+line console 0
+ login local
+ exec-timeout 5 0
+ logging synchronous
+ exit
+
+! 5. Proteção das Linhas de Rede (SSH / Telnet):
+
+line vty 0 4
+ login local
+ transport input ssh telnet
+ exec-timeout 5 0
+ logging synchronous
+ exit
+
+write memory
 ```
 
 <details>
+
+
+**Para testar:**
+
+`telnet 10.0.0.1`
+
+`ssh -l admin 10.0.0.1`
+
+
+
+**! Visualizar configurações ativas e resumo de interfaces**
 ```
-ip domain-name cinel.wan
-username admin secret cinel
-crypto key generate rsa
-2048
-ip ssh version 2
-line vty 0 4
-login local
-transport input ssh
-exit
+Router# show running-config
+Router# show ip interface brief
+
+! Guardar alterações da RAM para a NVRAM
+Router# copy running-config startup-config
+
+! Atalho equivalente
+Router# write memory
 ```
-   
 </details>
+
 
 ---
 
@@ -481,6 +525,8 @@ Switch0(config-vlan)# name Portas_Inativas
 Switch0(config-vlan)# exit
 ```
 
+**1. No Switch Central (Switch0)**
+
 ``` 
 Switch0(config)# interface range fastEthernet 0/4 - 9 , fastEthernet 0/11 - 23 , gigabitEthernet 0/1 - 2
 Switch0(config-if-range)# switchport mode access
@@ -492,7 +538,7 @@ Switch0# write memory
 
 
 
-**SWITCH 1 e 2 (Switches de Acesso):**
+**2. Nos Switches de Acesso (Switch1 e Switch2):**
 - Portas em uso: `Fa0/1`, `Fa0/2`, `Fa0/3` (PCs) e `Fa0/24` (trunk).
 - Portas para fechar: `Fa0/4-23`, `Gi0/1-2`.
 
@@ -504,7 +550,7 @@ Switch1(config-vlan)# exit
 ```
 
 ```
-Switch1(config)# interface range fastEthernet 0/4 - 23 , gigabitEthernet 0/1 - 2
+Switch1(config)# interface range fastEthernet 0/4-23 , gigabitEthernet 0/1-2
 Switch1(config-if-range)# switchport mode access
 Switch1(config-if-range)# switchport access vlan 99
 Switch1(config-if-range)# shutdown
@@ -512,7 +558,7 @@ Switch1(config-if-range)# exit
 Switch1# write memory
 ```
 
-**`Repetir exatamente estes mesmos comandos no Switch2`**
+`Repetir exatamente estes mesmos comandos no Switch2`
 
 
 **Como verificar se as portas ficaram fechadas?**
@@ -559,24 +605,20 @@ ssh -l admin 10.0.0.1
 
 # 4. Checklist rápido
 
-- [ ] VLANs 10, 20 e 30 criadas em Switch0, Switch1 e Switch2
+[ ] VLANs: VLANs 10, 20, 30, 99 e 999 criadas em todos os switches.
 
-- [ ] Portas de acesso aos PCs associadas às VLANs corretas (PC0 a PC6)
+[ ] Trunks: Links Fa0/1-3 no Switch0 e Fa0/24 nos switches de acesso configurados em modo trunk.
 
-- [ ] Trunks configurados nas interligações entre switches e com o Router0
+[ ] Acesso: Portas dos utilizadores associadas às respetivas VLANs.
 
-- [ ] Router0: sub-interfaces Gi0/0.10, Gi0/0.20, Gi0/0.30 configuradas com gateway
+[ ] Router-on-a-Stick: Sub-interfaces Gi0/0.10, Gi0/0.20 e Gi0/0.30 ativas no Router0.
 
-- [ ] Router0: ip helper-address 192.168.10.254 adicionado em Gi0/0.20 e Gi0/0.30
+[ ] DHCP Relay: Comando ip helper-address 192.168.10.254 aplicado em Gi0/0.20 e Gi0/0.30.
 
-- [ ] Server-DHCP: IP fixo 192.168.10.254/24 e as 3 Pools ativas (serverPool, VLAN20, VLAN30)
+[ ] Server-DHCP: IP fixo 192.168.10.254/24 definido e os 3 pools ativos.
 
-- [ ] Os 6 PCs configurados em modo DHCP obtendo os seus respetivos IPs
+[ ] Endereçamento: Todos os PCs a obter IP e Gateway dinamicamente via DHCP.
 
-- [ ] Testes de ping 8a, 8b e 8c realizados com sucesso
+[ ] Gestão & SSH: SVIs VLAN 999 ativas nos switches e SSH funcional a partir do PC-Gestao.
 
-- [ ] VLAN 999 Gestao criada e SVIs configuradas nos 3 switches
-
-- [ ] SSH configurado nos 3 switches e testado a partir do PC-Gestao (sucesso) e de um PC de acesso (falha)
-
-- [ ] Portas inativas fechadas com a VLAN 99 em todos os switches
+[ ] Hardening: Passwords encriptadas, login local, banner e portas inativas na VLAN 99 com estado shutdown.
