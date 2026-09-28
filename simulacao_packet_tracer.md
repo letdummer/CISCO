@@ -1,11 +1,11 @@
-# Guia de Configuração — VLANs, Trunk, ROAS e SSH/TELNET (Cisco Packet Tracer)
+# Guia de Configuração — VLANs, Trunk, VLAN Native 40, ROAS e SSH/TELNET (Cisco Packet Tracer)
 
 ## Índice
 
 1. [Topologia e Endereçamento](#1-topologia-e-endereçamento)
 2. [Passo a Passo no Cisco IOS](#2-passo-a-passo-no-cisco-ios)
    - [Tópico 1 — Criar VLANs e VTP](#-tópico-1--criar-vlans-e-vtp)
-   - [Tópico 2 — Portas de acesso e trunk](#-tópico-2--portas-de-acesso-e-trunk)
+   - [Tópico 2 — Portas de acesso, trunk e VLAN nativa](#-tópico-2--portas-de-acesso-trunk-e-vlan-nativa)
    - [Tópico 3 — Router-on-a-Stick e DHCP-Relay](#-tópico-3--router-on-a-stick-e-dhcp-relay)
    - [Tópico 4 — Configuração do DHCP e Pools](#-tópico-4--configuração-do-server-dhcp-e-pools)
    - [Tópico 5 — VLAN 999 e SSH](#-tópico-5--vlan-999-e-ssh)
@@ -49,6 +49,8 @@
    Fa0/3: PC2 (V30)       Fa0/3: PC5 (V10)
 ```
 
+> 📌 Todos os links trunk (Router0↔Switch0, Switch0↔Switch1, Switch0↔Switch2) usam a **VLAN 40 como VLAN nativa** (tráfego sem tag 802.1Q).
+
 ### » VLANs, sub-redes e gateway
 
 | VLAN | Nome | Sub-rede | Máscara | Gateway (`Router0`) |
@@ -56,9 +58,12 @@
 | `10` | Estudantes | `192.168.10.0` | `/24` | `192.168.10.1` |
 | `20` | Professores | `192.168.20.0` | `/24` | `192.168.20.1` |
 | `30` | Direcao | `192.168.30.0` | `/24` | `192.168.30.1` |
+| `40` | Native | `192.168.40.0` | `/24` | `192.168.40.1` *(sub-interface nativa)* |
 | `999` | Gestao | `10.0.0.0` | `/8` | — *(sem gateway, ver nota)* |
 
-> 📌 **Nota:** a VLAN 999 **não** tem sub-interface no router propositadamente, para a rede de gestão ficar isolada das VLANs de utilizador — isto mantém válidos os testes de SSH dos pontos 12 e 13 do enunciado.
+> 📌 **Nota (VLAN 40):** a VLAN 40 é a **VLAN nativa** dos trunks. Não tem PCs nem pool DHCP; existe apenas para transportar tráfego sem tag (ex.: CDP/STP). No `Router0` a sub-interface `Gi0/0.40` é criada com `encapsulation dot1Q 40 native`. A VLAN 1 deixa de ser usada como nativa (boa prática de segurança).
+
+> 📌 **Nota:** a VLAN 999 **não tem sub-interface** no router propositadamente, para a rede de gestão ficar isolada das VLANs de utilizador — isto mantém válidos os testes de SSH dos pontos 12 e 13 do enunciado.
 
 ### » Endereços IP dos PCs
 
@@ -82,7 +87,7 @@
 
 ### Opção A: Distribuição Automática via VTP
 ⚠️ Atenção: Se optares por VTP, deves configurar primeiro os links Trunk (Tópico 2) entre os switches antes de criar as VLANs no VTP Server.
----> [Configuração Trunk](#-tópico-2--portas-de-acesso-e-trunk)
+---> [Configuração Trunk](#-tópico-2--portas-de-acesso-trunk-e-vlan-nativa)
   
 <details>
 
@@ -107,6 +112,8 @@ vlan 20
  name Professores
 vlan 30
  name Direcao
+vlan 40
+ name Native
 vlan 999
  name Gestao
 vlan 99
@@ -149,6 +156,8 @@ vlan 20
  name Professores
 vlan 30
  name Direcao
+vlan 40
+ name Native
 vlan 999
  name Gestao
 vlan 99
@@ -169,6 +178,8 @@ vlan 20
 name Professores
 vlan 30
 name Direcao
+vlan 40
+name Native
 exit
 exit
 write memory
@@ -183,15 +194,18 @@ show vlan brief
 
 ---
 
-## » Tópico 2 — Portas de acesso e trunk
+## » Tópico 2 — Portas de acesso, trunk e VLAN nativa
 
 **Switch Central (Switch0)**
 
-Trunk para o Router0 (Fa0/1), Switch1 (Fa0/2) e Switch2 (Fa0/3)
+Trunk para o Router0 (Fa0/1), Switch1 (Fa0/2) e Switch2 (Fa0/3), com **VLAN 40 como nativa**
+
+> ⚠️ A VLAN 40 tem de existir no switch (Tópico 1) e a VLAN nativa tem de ser **igual nas duas pontas** de cada trunk, caso contrário o STP/CDP reporta *native VLAN mismatch*.
 
 ```bash
 Switch0(config)# interface range fastEthernet 0/1-3
 Switch0(config-if-range)# switchport mode trunk
+Switch0(config-if-range)# switchport trunk native vlan 40
 Switch0(config-if-range)# no shutdown
 Switch0(config-if-range)# exit
 Switch0# write memory
@@ -206,6 +220,7 @@ Trunk
 ```
 Switch1(config)# interface fastEthernet 0/24
 Switch1(config-if)# switchport mode trunk
+Switch1(config-if)# switchport trunk native vlan 40
 Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
 ```
@@ -245,6 +260,7 @@ Trunk para o SW0
 ```
 Switch2(config)# interface fastEthernet 0/24
 Switch2(config-if)# switchport mode trunk
+Switch2(config-if)# switchport trunk native vlan 40
 Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
 ```
@@ -286,6 +302,8 @@ Switch2# write memory
 ```
 show interfaces trunk
 ```
+
+> ✅ Na coluna **Native vlan** deve aparecer `40` em todas as portas trunk (Fa0/1-3 no Switch0 e Fa0/24 no Switch1 e Switch2). A VLAN 40 deve constar em *VLANs allowed and active in management domain*.
 
 <!--
 | Port | Mode | Encapsulation | Status | Nativa vlan |
@@ -338,11 +356,23 @@ Router0(config-subif)# ip address 192.168.30.1 255.255.255.0
 
 Router0(config-subif)# ip helper-address 192.168.10.254
 Router0(config-subif)# exit
+```
+
+**VLAN 40 (Native) — sem DHCP Relay**
+```bash
+Router0(config)# interface gigabitEthernet 0/0.40
+Router0(config-subif)# encapsulation dot1Q 40 native
+
+Router0(config-subif)# ip address 192.168.40.1 255.255.255.0
+
+Router0(config-subif)# exit
 Router0(config)# exit
 Router0# write memory
 ```
 
-> 📌 A interface física `Gi0/0` **não** recebe IP quando se usam sub-interfaces — só precisa de `no shutdown`. Repara que **não existe** `Gi0/0.999`: a VLAN de gestão fica fora do routing de propósito.
+> 📌 A palavra-chave `native` na sub-interface indica ao router que o tráfego da VLAN 40 circula **sem tag**, em coerência com `switchport trunk native vlan 40` nos switches. Não é necessário `ip helper-address`, pois não há PCs nesta VLAN.
+
+> 📌 A interface física `Gi0/0` **não** recebe IP quando se usam sub-interfaces — só precisa de `no shutdown`. Repara que a `Gi0/0.40` é a sub-interface **nativa** e que **não existe** `Gi0/0.999`: a VLAN de gestão fica fora do routing de propósito.
 
 ---
 
@@ -561,6 +591,14 @@ Switch1# write memory
 `Repetir exatamente estes mesmos comandos no Switch2`
 
 
+**Como verificar a VLAN nativa e as sub-interfaces?**
+
+```
+Switch0# show interfaces trunk
+Router0# show ip interface brief
+Router0# show running-config | section Gi0/0.40
+```
+
 **Como verificar se as portas ficaram fechadas?**
 Usa o comando em modo privilegiado para ver o estado das interfaces:
 
@@ -600,18 +638,21 @@ ssh -l admin 10.0.0.1
 | 8c. `PC2` ↔ `PC3` | ✅ Sucesso (mesma VLAN30, via trunk) |
 | 12. SSH do PC da VLAN999 | ✅ Sucesso — mesmo domínio L2 da gestão |
 | 13. SSH de um PC de outra VLAN | ❌ Falha — VLAN 999 sem sub-interface no router |
+| Trunks (`show interfaces trunk`) | ✅ Native vlan = `40` em todos os trunks, sem *native VLAN mismatch* |
 
 ---
 
 # 4. Checklist rápido
 
-[ ] VLANs: VLANs 10, 20, 30, 99 e 999 criadas em todos os switches.
+[ ] VLANs: VLANs 10, 20, 30, 40, 99 e 999 criadas em todos os switches.
 
 [ ] Trunks: Links Fa0/1-3 no Switch0 e Fa0/24 nos switches de acesso configurados em modo trunk.
 
+[ ] VLAN Nativa: `switchport trunk native vlan 40` aplicado em todos os trunks (Fa0/1-3 no Switch0, Fa0/24 no Switch1 e Switch2) e confirmado com `show interfaces trunk`.
+
 [ ] Acesso: Portas dos utilizadores associadas às respetivas VLANs.
 
-[ ] Router-on-a-Stick: Sub-interfaces Gi0/0.10, Gi0/0.20 e Gi0/0.30 ativas no Router0.
+[ ] Router-on-a-Stick: Sub-interfaces Gi0/0.10, Gi0/0.20, Gi0/0.30 e Gi0/0.40 (`encapsulation dot1Q 40 native`) ativas no Router0.
 
 [ ] DHCP Relay: Comando ip helper-address 192.168.10.254 aplicado em Gi0/0.20 e Gi0/0.30.
 
