@@ -1,12 +1,4 @@
-# Guia de Simulação — VLANs, Trunk, Router-on-a-Stick e Gestão SSH (Cisco Packet Tracer)
-
-> Este guia parte do enunciado "VLANS" (ex1_vlans, 3 switches Cisco 2960-24TT, sem router) e **acrescenta um router configurado em Router-on-a-Stick (ROAS)** para fazer routing inter-VLAN. Confirma os nomes reais dos teus dispositivos e portas no teu `.pkt` — os nomes usados abaixo (`Switch0`, `Switch1`, `Switch2`, `Router0`, `Fa0/1`...`Fa0/24`, `Gi0/0`) são um exemplo coerente com o diagrama original; ajusta-os se a tua topologia usar outros números.
-
-> ⚠️ **Atenção:** o enunciado original (ponto 8b) espera que o ping **entre VLANs diferentes falhe**, porque a topologia base não tem router. Com o Router-on-a-Stick deste guia, esse teste passa a **ter sucesso**. Se este documento for para entregar como resposta ao enunciado original, confirma com o professor se a adição do router é pretendida.
-
----
-
-
+# Guia de Configuração — VLANs, Trunk, ROAS e SSH/TELNET (Cisco Packet Tracer)
 
 ## Índice
 
@@ -29,7 +21,7 @@
 
 ### » Dispositivos
 
-| Dispositivo | Papel |
+| Dispositivo | Função |
 |---|---|
 | `Switch0` | Switch central (distribuição) — liga Switch1, Switch2, Router0, Server-DHCP e PC-Gestao |
 | `Switch1` | Switch de acesso — liga PC0, PC1, PC2 |
@@ -85,16 +77,81 @@
 
 # 2. Passo a Passo no Cisco IOS
 
-## ! ALTERAR HOSTNAME DE CADA DISPOSITIVO ! 
+## » Tópico 1 — Criar VLANs
+
+
+### Criar VLANs com VTP : 
+Caso escolha utilizar VTP, deve `configurar o TRUNK` primeiro para que os switchs recebam a tabela de VLANs.
+
+---> [Configuração Trunk](#-tópico-2--portas-de-acesso-e-trunk)
+  
+<details>
+   
+```
+Switch0> enable
+Switch0# configure terminal
+Switch0(config)# vTP domain cinel-domain
+Switch0(config)# vtp mode server
+   
+! (Opcional, mas boa prática):
+Switch0(config)# vtp password cinel
 
 ```
+
+> **Criar todas as VLANS apenas no `Switch0`**
+
+```bash
 enable
 configure terminal
-hostname NAME
+vlan 10
+ name Estudantes
+vlan 20
+ name Professores
+vlan 30
+ name Direcao
+vlan 999
+ name Gestao
+vlan 99
+ name Portas_Inativas
+exit
+write memory
+```
+
+### Configurar Cliente VTP no SW1 e SW2:
+
+```
+Switch1> enable
+Switch1# configure terminal
+Switch1(config)# vtp domain cinel-domain
+Switch1(config)# vtp mode client
+! Se definiste password no Server:
+Switch1(config)# vtp password cinel
+Switch1(config)# exit
+Switch1# write memory
 ```
 
 
-## » Tópico 1 — Criar VLANs
+### Confirmar funcionamento do VTP
+
+`show vtp status`
+
+</details>
+
+
+### Criar VLANs sem vtp:
+
+```bash
+enable
+configure terminal
+vlan 10
+ name Estudantes
+vlan 20
+ name Professores
+vlan 30
+ name Direcao
+exit
+write memory
+```
 
 Repetir em `Switch0`, `Switch1` e `Switch2`:
 
@@ -114,19 +171,6 @@ exit
 write memory
 ```
 </details>
-
-```bash
-enable
-configure terminal
-vlan 10
- name Estudantes
-vlan 20
- name Professores
-vlan 30
- name Direcao
-exit
-write memory
-```
 
 **Teste:**
 ```
@@ -430,11 +474,14 @@ Switch0# write memory
 - Portas em uso: `Fa0/1`, `Fa0/2`, `Fa0/3` (trunks). `Fa0/10` (Pc-Gestao) e `Fa0/24` (server-DHCP)
 - Portas para fechar: `Fa0/4-9`, `Fa0/11-23`, `Gi0/1-2`.
 
+**(se não foi criada com vtp, criar VLAN 99 para Portas Inativas)**
 ```
 Switch0(config)# vlan 99
 Switch0(config-vlan)# name Portas_Inativas
 Switch0(config-vlan)# exit
+```
 
+``` 
 Switch0(config)# interface range fastEthernet 0/4 - 9 , fastEthernet 0/11 - 23 , gigabitEthernet 0/1 - 2
 Switch0(config-if-range)# switchport mode access
 Switch0(config-if-range)# switchport access vlan 99
@@ -449,11 +496,14 @@ Switch0# write memory
 - Portas em uso: `Fa0/1`, `Fa0/2`, `Fa0/3` (PCs) e `Fa0/24` (trunk).
 - Portas para fechar: `Fa0/4-23`, `Gi0/1-2`.
 
+**(se não foi criada com vtp, criar VLAN 99 para Portas Inativas)**
 ```
 Switch1(config)# vlan 99
 Switch1(config-vlan)# name Portas_Inativas
 Switch1(config-vlan)# exit
+```
 
+```
 Switch1(config)# interface range fastEthernet 0/4 - 23 , gigabitEthernet 0/1 - 2
 Switch1(config-if-range)# switchport mode access
 Switch1(config-if-range)# switchport access vlan 99
