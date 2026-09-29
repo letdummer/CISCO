@@ -261,8 +261,8 @@ Router0(config)# interface gigabitEthernet 0/0.20
 Router0(config-subif)# encapsulation dot1Q 20
 
 Router0(config-subif)# ip address 192.168.20.1 255.255.255.0
-
 Router0(config-subif)# ip helper-address 192.168.10.254
+
 Router0(config-subif)# exit
 ```
 
@@ -272,8 +272,8 @@ Router0(config)# interface gigabitEthernet 0/0.30
 Router0(config-subif)# encapsulation dot1Q 30
 
 Router0(config-subif)# ip address 192.168.30.1 255.255.255.0
-
 Router0(config-subif)# ip helper-address 192.168.10.254
+
 Router0(config-subif)# exit
 ```
 
