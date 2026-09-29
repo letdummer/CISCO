@@ -6,13 +6,13 @@
 2. [Passo a Passo no Cisco IOS](#2-passo-a-passo-no-cisco-ios)
    - [Tópico 1 — Criar VLANs](#-tópico-1--criar-vlans)
    - [Tópico 2 — Portas de acesso, trunk e VLAN nativa](#-tópico-2--portas-de-acesso-trunk-e-vlan-nativa)
-   - [Tópico 3 — Router-on-a-Stick e DHCP-Relay](#-tópico-3--router-on-a-stick-e-dhcp-relay)
-   - [Tópico 4 — Configuração do DHCP e Pools](#-tópico-4--configuração-do-server-dhcp-e-pools)
-   - [Tópico 5 — VLAN 999 e SSH](#-tópico-5--vlan-999-e-ssh)
-   - [Tópico 6 — PC na Fa0/10 com VLAN 999 e Porta do Server-DHCP](#-tópico-6--pc-na-fa010-com-vlan-999-e-porta-server-dhcp)
+   - [Tópico 3 — Portas do PC-Gestao e do Server-DHCP](#-tópico-3--portas-do-pc-gestao-e-do-server-dhcp)
+   - [Tópico 4 — Router-on-a-Stick e DHCP-Relay](#-tópico-4--router-on-a-stick-e-dhcp-relay)
+   - [Tópico 5 — Configuração do DHCP e Pools](#-tópico-5--configuração-do-server-dhcp-e-pools)
+   - [Tópico 6 — VLAN 999 e SSH](#-tópico-6--vlan-999-e-ssh)
    - [Tópico 7 — Fechar portas](#-tópico-7--fechar-portas)
    - [Testar SSH](#-testar-o-acesso-ssh)
-3. [Checklist rápido](#4-checklist-rápido)
+3. [Checklist rápido](#3-checklist-rápido)
 
 ---
 
@@ -142,7 +142,7 @@ Switch1(config)# interface fastEthernet 0/24
 Switch1(config-if)# switchport mode trunk
 Switch1(config-if)# switchport trunk allowed vlan 10,20,30,40,999
 Switch1(config-if)# switchport trunk native vlan 40
-Switch1(config-if-range)# switchport nonegotiate
+Switch1(config-if)# switchport nonegotiate
 Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
 ```
@@ -183,7 +183,7 @@ Switch2(config)# interface fastEthernet 0/24
 Switch2(config-if)# switchport mode trunk
 Switch2(config-if)# switchport trunk allowed vlan 10,20,30,40,999
 Switch2(config-if)# switchport trunk native vlan 40
-Switch2(config-if-range)# switchport nonegotiate
+Switch2(config-if)# switchport nonegotiate
 Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
 ```
@@ -232,7 +232,44 @@ show interfaces trunk
 
 ---
 
-## » Tópico 3 — Router-on-a-Stick e DHCP-Relay
+## » Tópico 3 — Portas do PC-Gestao e do Server-DHCP
+
+> ⚠️ **Fazer isto antes de configurar o router e o DHCP.** Se a Fa0/24 (Server-DHCP) ou a Fa0/10 (PC-Gestao) ficarem na VLAN 1 (por omissão), os pedidos DHCP dos PCs nunca chegam ao servidor. Configurar sempre **todas** as portas de acesso antes de avançar.
+
+**Switch0 (Switch Central)**
+
+**Porta do PC-Gestao (VLAN 999)**
+```bash
+Switch0(config)# interface fastEthernet 0/10
+Switch0(config-if)# switchport mode access
+Switch0(config-if)# switchport access vlan 999
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
+```
+
+
+**Porta do Server-DHCP (VLAN 10)** — *é uma porta de acesso, não confundir com os trunks*
+```
+Switch0(config)# interface fastEthernet 0/24
+Switch0(config-if)# switchport mode access
+Switch0(config-if)# switchport access vlan 10
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
+Switch0(config)# end
+Switch0# write memory
+```
+
+**Confirmação:**
+
+```
+show vlan brief
+```
+
+> ✅ A `Fa0/10` deve aparecer na VLAN `999` e a `Fa0/24` na VLAN `10`. Se aparecerem na `default` (VLAN 1), a configuração não foi aplicada.
+
+---
+
+## » Tópico 4 — Router-on-a-Stick e DHCP-Relay
 
 > Mecanismo do DHCP Relay: Como o Server-DHCP se encontra fisicamente na VLAN 10, os pedidos de DHCP (broadcasts) emitidos pelas VLANs 20 e 30 são descartados pelo router por omissão. O comando ip helper-address 192.168.10.254 converte esses broadcasts em mensagens unicast direcionadas diretamente ao IP do servidor.
 
@@ -285,8 +322,6 @@ Router0(config-subif)# encapsulation dot1Q 40 native
 Router0(config-subif)# ip address 192.168.40.1 255.255.255.0
 
 Router0(config-subif)# exit
-Router0(config)# exit
-Router0# write memory
 ```
 
 **VLAN 999 (Gestão) — Criar presença do router na rede de gestão**
@@ -295,19 +330,22 @@ Router0(config)# interface gigabitEthernet 0/0.999
 Router0(config-subif)# encapsulation dot1Q 999
 Router0(config-subif)# ip address 10.99.99.254 255.255.255.0
 Router0(config-subif)# exit
-Router0(config)# exit
+Router0(config)# end
 Router0# write memory
 ```
 
 **Verificação:**
-`show running-config | include helper-address`
+```
+show ip interface brief
+show running-config | include helper-address
+```
 
 
 > 📌 A palavra-chave `native` na sub-interface indica ao router que o tráfego da VLAN 40 circula **sem tag**, em coerência com `switchport trunk native vlan 40` nos switches. Não é necessário `ip helper-address`, pois não há PCs nesta VLAN.
 
 ---
 
-## » Tópico 4 — Configuração do Server-DHCP e Pools
+## » Tópico 5 — Configuração do Server-DHCP e Pools
 
 **Configuração Manual do Server-DHCP | IP Estático**
 
@@ -320,11 +358,21 @@ Router0# write memory
 
 `Services -> DHCP` : **ON**
 
-| Pool | Default Gateway | Start IP Address | Subnet Mask |
-|:-------:|:------------:|:-------------:|:---:|
-| VLAN 10 | 192.168.10.1 | 192.168.10.50 | 255.255.255.0 |
-| VLAN 20 | 192.168.20.1 | 192.168.20.50 | 255.255.255.0 |
-| VLAN 30 | 192.168.30.1 | 192.168.30.50 | 255.255.255.0 |
+| Pool | Default Gateway | Start IP Address | Subnet Mask | Max. utilizadores |
+|:-------:|:------------:|:-------------:|:---:|:---:|
+| serverPool *(VLAN 10)* | 192.168.10.1 | 192.168.10.50 | 255.255.255.0 | 100 |
+| VLAN 20 | 192.168.20.1 | 192.168.20.50 | 255.255.255.0 | 100 |
+| VLAN 30 | 192.168.30.1 | 192.168.30.50 | 255.255.255.0 | 100 |
+
+> ⚠️ **Sobre o pool `serverPool`:** o Packet Tracer traz um pool por omissão (`serverPool`) que **não pode ser removido** (o botão *Remove* fica desativado). Se for mantido com os valores originais (`192.168.10.0`, 256 utilizadores), sobrepõe-se ao pool da VLAN 10 e abrange o gateway (`.1`) e o próprio servidor (`.254`).
+>
+> **Solução:** editar o `serverPool` e usá-lo como pool da VLAN 10:
+> 1. Clicar na linha `serverPool` na tabela.
+> 2. Alterar *Default Gateway* para `192.168.10.1`, *Start IP Address* para `192.168.10.50` e *Maximum Number of Users* para `100`.
+> 3. Clicar em **Save**.
+> 4. Não criar um pool extra `VLAN10` (ou, se já existir, selecioná-lo e clicar em **Remove**).
+>
+> Para os pools das VLANs 20 e 30, preencher os campos e clicar em **Add**.
 
 **ATRIBUIR IP AOS PCS**
 
@@ -336,7 +384,7 @@ ativar `DHCP`
 
 ---
 
-## » Tópico 5 — VLAN 999 e SSH
+## » Tópico 6 — VLAN 999 e SSH
 
 > A VLAN 999 já foi criada no Tópico 1. Confirmar com `show vlan brief` em cada switch.
 
@@ -447,33 +495,6 @@ Router# write memory
 
 ---
 
-## » Tópico 6 — PC na Fa0/10 com VLAN 999 e Porta Server-DHCP
-
-# SW-0
-
-**Porta do PC-Gestao (VLAN 999)**
-```bash
-Switch0(config)# interface fastEthernet 0/10
-Switch0(config-if)# switchport mode access
-Switch0(config-if)# switchport access vlan 999
-Switch0(config-if)# no shutdown
-Switch0(config-if)# exit
-```
-
-
-**Porta do Server-DHCP (VLAN 10)**
-```
-Switch0(config)# interface fastEthernet 0/24
-Switch0(config-if)# switchport mode access
-Switch0(config-if)# switchport access vlan 10
-Switch0(config-if)# no shutdown
-Switch0(config-if)# exit
-Switch0# exit
-Switch0# write memory
-```
-
----
-
 ## » Tópico 7 — FECHAR PORTAS
 
 **SWITCH 0 (Switch Central):**
@@ -558,11 +579,13 @@ ssh -l admin 10.99.99.1
 
 [ ] Acesso: Portas dos utilizadores associadas às respetivas VLANs.
 
+[ ] Portas do Switch0: Fa0/10 (PC-Gestao) na VLAN 999 e Fa0/24 (Server-DHCP) na VLAN 10, confirmado com `show vlan brief`.
+
 [ ] Router-on-a-Stick: Sub-interfaces Gi0/0.10, Gi0/0.20, Gi0/0.30 e Gi0/0.40 (`encapsulation dot1Q 40 native`) ativas no Router0.
 
 [ ] DHCP Relay: Comando ip helper-address 192.168.10.254 aplicado em Gi0/0.20 e Gi0/0.30.
 
-[ ] Server-DHCP: IP fixo 192.168.10.254/24 definido e os 3 pools ativos.
+[ ] Server-DHCP: IP fixo 192.168.10.254/24 definido e os 3 pools ativos, sem sobreposição (`serverPool` ajustado para a VLAN 10).
 
 [ ] Endereçamento: Todos os PCs a obter IP e Gateway dinamicamente via DHCP.
 
