@@ -188,6 +188,7 @@ Trunk para o Router0 (Fa0/1), Switch1 (Fa0/2) e Switch2 (Fa0/3), com **VLAN 40 c
 ```bash
 Switch0(config)# interface range fastEthernet 0/1-3
 Switch0(config-if-range)# switchport mode trunk
+Switch0(config-if-range)# switchport trunk allowed vlan 10,20,30,40,999
 Switch0(config-if-range)# switchport trunk native vlan 40
 Switch0(config-if-range)# no negotiate
 Switch0(config-if-range)# no shutdown
@@ -204,6 +205,7 @@ Trunk
 ```
 Switch1(config)# interface fastEthernet 0/24
 Switch1(config-if)# switchport mode trunk
+Switch1(config-if)# switchport trunk allowed vlan 10,20,30,40,999
 Switch1(config-if)# switchport trunk native vlan 40
 Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
