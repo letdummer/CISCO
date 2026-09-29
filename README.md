@@ -299,6 +299,9 @@ Router0(config)# exit
 Router0# write memory
 ```
 
+**Verificação:**
+`show running-config | include helper-address`
+
 
 > 📌 A palavra-chave `native` na sub-interface indica ao router que o tráfego da VLAN 40 circula **sem tag**, em coerência com `switchport trunk native vlan 40` nos switches. Não é necessário `ip helper-address`, pois não há PCs nesta VLAN.
 
