@@ -85,9 +85,10 @@
 
 
 ### Opção A: Distribuição Automática via VTP
-⚠️ Atenção: Se optares por VTP, siga esta ordem:
 
-   - configurar primeiro os links Trunk entre os switches
+> ⚠️ Atenção: Se optares por VTP, siga esta ordem:
+
+   - configurar primeiro os links **TRUNK** entre os switches
          ---> [Configuração Trunk](#-tópico-2--portas-de-acesso-trunk-e-vlan-nativa)
    - configurar o VTP Server (switch0, central)
    - criar as vlans no switch central
