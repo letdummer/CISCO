@@ -213,7 +213,7 @@ Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
 ```
 
-Portas de acesso aos PCs
+**Portas de acesso aos PCs**
 
 ```
 Switch1(config)# interface fastEthernet 0/1
@@ -241,9 +241,8 @@ Switch1# write memory
 
 
 **Switch de Acesso (SW-02)**
-<Details>
 
-Trunk para o SW0
+<Details>
 
 ```
 Switch2(config)# interface fastEthernet 0/24
@@ -255,27 +254,23 @@ Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
 ```
 
-# Portas de acesso aos PCs no Switch2
+**Portas de acesso** aos PCs no Switch2
 ```
 Switch2(config)# interface fastEthernet 0/1
 Switch2(config-if)# switchport mode access
-Switch2(config-if)# switchport access vlan 30
+Switch2(config-if)# switchport access vlan 10
 Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
-```
 
-```
 Switch2(config)# interface fastEthernet 0/2
 Switch2(config-if)# switchport mode access
 Switch2(config-if)# switchport access vlan 20
 Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
-```
 
-```
 Switch2(config)# interface fastEthernet 0/3
 Switch2(config-if)# switchport mode access
-Switch2(config-if)# switchport access vlan 10
+Switch2(config-if)# switchport access vlan 30
 Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
 ```
