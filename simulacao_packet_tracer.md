@@ -166,26 +166,6 @@ exit
 write memory
 ```
 
-
-<details>
-
-```
-enable
-configure terminal
-vlan 10
-name Estudantes
-vlan 20
-name Professores
-vlan 30
-name Direcao
-vlan 40
-name Native
-exit
-exit
-write memory
-```
-</details>
-
 **Teste:**
 ```
 show vlan brief
