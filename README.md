@@ -26,7 +26,7 @@
 | `Switch1` | Switch de acesso — liga PC0, PC1, PC2 |
 | `Switch2` | Switch de acesso — liga PC3, PC4, PC5 |
 | `Router0` | Router-on-a-Stick — faz o routing inter-VLAN |
-| `Server-DHCP` | Servidor DHCP na VLAN 10 para todas sub-redes |
+| `Server-DHCP` | Servidor DHCP na **VLAN 50** para todas sub-redes |
 | `PC-Gestao` | PC de gestão na VLAN 999 |
 | `PC0`–`PC5` | Terminais dos utilizadores |
 
@@ -61,6 +61,7 @@
 | `30` | Direcao | `192.168.30.0` | `/24` | `192.168.30.1` |
 | `40` | Native | `192.168.40.0` | `/24` | `192.168.40.1` *(sub-interface nativa)* |
 | `999` | Gestao | `10.99.99.0` | `/24` | `10.99.99.254` |
+| `50` | Servidor | `192.168.50.0` | `/24` | `192.168.50.1` |
 
 > 📌 **Nota (VLAN 40):** a VLAN 40 é a **VLAN nativa** dos trunks. Não tem PCs nem pool DHCP; existe apenas para transportar tráfego sem tag (ex.: CDP/STP). No `Router0` a sub-interface `Gi0/0.40` é criada com `encapsulation dot1Q 40 native`. A VLAN 1 deixa de ser usada como nativa (boa prática de segurança).
 
@@ -74,7 +75,7 @@
 | `PC4` | 20 | `DHCP`  | `192.168.20.x` | `/24` | `192.168.20.1` |
 | `PC2` | 30 | `DHCP` | `192.168.30.x` | `/24` | `192.168.30.1` |
 | `PC3` | 30 | `DHCP`  | `192.168.30.x` | `/24` | `192.168.30.1` |
-| `Server-DHCP` | `10` | `Estático`  | `192.168.10.254` | `/24` | `192.168.10.1` |
+| `Server-DHCP` | `50` | `Estático`  | `192.168.50.254` | `/24` | `192.168.50.1` |
 | `PC-Gestao` | `999` | `Estático` | `10.99.99.10` | `/24` | `10.99.99.254` |
 
 ---
@@ -96,6 +97,8 @@ vlan 30
  name Direcao
 vlan 40
  name Native
+vlan 50
+ name Servidor
 vlan 999
  name Gestao
 vlan 99
@@ -123,7 +126,7 @@ Trunk para o Router0 (Fa0/1), Switch1 (Fa0/2) e Switch2 (Fa0/3), com **VLAN 40 c
 ```bash
 Switch0(config)# interface range fastEthernet 0/1-3
 Switch0(config-if-range)# switchport mode trunk
-Switch0(config-if-range)# switchport trunk allowed vlan 10,20,30,40,999
+Switch0(config-if-range)# switchport trunk allowed vlan 10,20,30,40,50,999
 Switch0(config-if-range)# switchport trunk native vlan 40
 Switch0(config-if-range)# switchport nonegotiate
 Switch0(config-if-range)# no shutdown
@@ -140,7 +143,7 @@ Trunk
 ```
 Switch1(config)# interface fastEthernet 0/24
 Switch1(config-if)# switchport mode trunk
-Switch1(config-if)# switchport trunk allowed vlan 10,20,30,40,999
+Switch1(config-if)# switchport trunk allowed vlan 10,20,30,40,50,999
 Switch1(config-if)# switchport trunk native vlan 40
 Switch1(config-if)# switchport nonegotiate
 Switch1(config-if)# no shutdown
@@ -181,7 +184,7 @@ Switch1# write memory
 ```
 Switch2(config)# interface fastEthernet 0/24
 Switch2(config-if)# switchport mode trunk
-Switch2(config-if)# switchport trunk allowed vlan 10,20,30,40,999
+Switch2(config-if)# switchport trunk allowed vlan 10,20,30,40,50,999
 Switch2(config-if)# switchport trunk native vlan 40
 Switch2(config-if)# switchport nonegotiate
 Switch2(config-if)# no shutdown
@@ -248,11 +251,11 @@ Switch0(config-if)# exit
 ```
 
 
-**Porta do Server-DHCP (VLAN 10)** — *é uma porta de acesso, não confundir com os trunks*
+**Porta do Server-DHCP (VLAN 50)** — *é uma porta de acesso, não confundir com os trunks*
 ```
 Switch0(config)# interface fastEthernet 0/24
 Switch0(config-if)# switchport mode access
-Switch0(config-if)# switchport access vlan 10
+Switch0(config-if)# switchport access vlan 50
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
 Switch0(config)# end
@@ -271,7 +274,7 @@ show vlan brief
 
 ## » Tópico 4 — Router-on-a-Stick e DHCP-Relay
 
-> Mecanismo do DHCP Relay: Como o Server-DHCP se encontra fisicamente na VLAN 10, os pedidos de DHCP (broadcasts) emitidos pelas VLANs 20 e 30 são descartados pelo router por omissão. O comando ip helper-address 192.168.10.254 converte esses broadcasts em mensagens unicast direcionadas diretamente ao IP do servidor.
+> Mecanismo do DHCP Relay: Como o Server-DHCP se encontra fisicamente na VLAN 10, os pedidos de DHCP (broadcasts) emitidos pelas VLANs 20 e 30 são descartados pelo router por omissão. O comando ip helper-address 192.168.50.254 converte esses broadcasts em mensagens unicast direcionadas diretamente ao IP do servidor.
 
 ```bash
 Router0> enable
@@ -288,6 +291,7 @@ Router0(config)# interface gigabitEthernet 0/0.10
 Router0(config-subif)# encapsulation dot1Q 10
 
 Router0(config-subif)# ip address 192.168.10.1 255.255.255.0
+Router0(config-subif)# ip helper-address 192.168.50.254
 
 Router0(config-subif)# exit
 ```
@@ -298,7 +302,7 @@ Router0(config)# interface gigabitEthernet 0/0.20
 Router0(config-subif)# encapsulation dot1Q 20
 
 Router0(config-subif)# ip address 192.168.20.1 255.255.255.0
-Router0(config-subif)# ip helper-address 192.168.10.254
+Router0(config-subif)# ip helper-address 192.168.50.254
 
 Router0(config-subif)# exit
 ```
@@ -309,7 +313,7 @@ Router0(config)# interface gigabitEthernet 0/0.30
 Router0(config-subif)# encapsulation dot1Q 30
 
 Router0(config-subif)# ip address 192.168.30.1 255.255.255.0
-Router0(config-subif)# ip helper-address 192.168.10.254
+Router0(config-subif)# ip helper-address 192.168.50.254
 
 Router0(config-subif)# exit
 ```
@@ -321,6 +325,14 @@ Router0(config-subif)# encapsulation dot1Q 40 native
 
 Router0(config-subif)# ip address 192.168.40.1 255.255.255.0
 
+Router0(config-subif)# exit
+```
+
+**VLAN 50**
+```
+Router0(config)# interface gigabitEthernet 0/0.50
+Router0(config-subif)# encapsulation dot1Q 50
+Router0(config-subif)# ip address 192.168.50.1 255.255.255.0
 Router0(config-subif)# exit
 ```
 
@@ -353,26 +365,18 @@ show running-config | include helper-address
 
 | Ip Address | Subnet Mask | Default Gateway |
 |:---:|:---:|:---:|
-| 192.168.10.254 | 255.255.255.0 | 192.168.10.1 |
+| 192.168.50.254 | 255.255.255.0 | 192.168.50.1 |
 
 
 `Services -> DHCP` : **ON**
 
 | Pool | Default Gateway | Start IP Address | Subnet Mask | Max. utilizadores |
 |:-------:|:------------:|:-------------:|:---:|:---:|
-| serverPool *(VLAN 10)* | 192.168.10.1 | 192.168.10.50 | 255.255.255.0 | 100 |
+| VLAN 50 | 192.168.50.1 | 192.168.50.50 | 255.255.255.0 | 100 |
+| VLAN 10 | 192.168.10.1 | 192.168.10.50 | 255.255.255.0 | 100 |
 | VLAN 20 | 192.168.20.1 | 192.168.20.50 | 255.255.255.0 | 100 |
 | VLAN 30 | 192.168.30.1 | 192.168.30.50 | 255.255.255.0 | 100 |
 
-> ⚠️ **Sobre o pool `serverPool`:** o Packet Tracer traz um pool por omissão (`serverPool`) que **não pode ser removido** (o botão *Remove* fica desativado). Se for mantido com os valores originais (`192.168.10.0`, 256 utilizadores), sobrepõe-se ao pool da VLAN 10 e abrange o gateway (`.1`) e o próprio servidor (`.254`).
->
-> **Solução:** editar o `serverPool` e usá-lo como pool da VLAN 10:
-> 1. Clicar na linha `serverPool` na tabela.
-> 2. Alterar *Default Gateway* para `192.168.10.1`, *Start IP Address* para `192.168.10.50` e *Maximum Number of Users* para `100`.
-> 3. Clicar em **Save**.
-> 4. Não criar um pool extra `VLAN10` (ou, se já existir, selecioná-lo e clicar em **Remove**).
->
-> Para os pools das VLANs 20 e 30, preencher os campos e clicar em **Add**.
 
 **ATRIBUIR IP AOS PCS**
 
@@ -583,7 +587,7 @@ ssh -l admin 10.99.99.1
 
 [ ] Router-on-a-Stick: Sub-interfaces Gi0/0.10, Gi0/0.20, Gi0/0.30 e Gi0/0.40 (`encapsulation dot1Q 40 native`) ativas no Router0.
 
-[ ] DHCP Relay: Comando ip helper-address 192.168.10.254 aplicado em Gi0/0.20 e Gi0/0.30.
+[ ] DHCP Relay: Comando ip helper-address 192.168.50.254 aplicado em Gi0/0.20 e Gi0/0.30.
 
 [ ] Server-DHCP: IP fixo 192.168.10.254/24 definido e os 3 pools ativos, sem sobreposição (`serverPool` ajustado para a VLAN 10).
 
