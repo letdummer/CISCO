@@ -74,7 +74,7 @@
 | `PC4` | 20 | `DHCP`  | `192.168.20.x` | `/24` | `192.168.20.1` |
 | `PC2` | 30 | `DHCP` | `192.168.30.x` | `/24` | `192.168.30.1` |
 | `PC3` | 30 | `DHCP`  | `192.168.30.x` | `/24` | `192.168.30.1` |
-| `Server-DHCP` | `50` | `Estático`  | `192.168.50.254` | `/24` | `192.168.50.1` |
+| `Server-DHCP` | `50` | `Estático`  | `172.17.50.0` | `/24` | `192.168.50.1` |
 | `PC-Gestao` | `50` | `Estático` | `192.168.50.10` | `/24` | `192.168.50.1` |
 
 ---
@@ -270,7 +270,7 @@ show vlan brief
 
 ## » Tópico 4 — Router-on-a-Stick e DHCP-Relay
 
-> Mecanismo do DHCP Relay: Como o Server-DHCP se encontra fisicamente na VLAN 50, os pedidos de DHCP (broadcasts) emitidos pelas VLANs 10, 20 e 30 são descartados pelo router por omissão. O comando ip helper-address 192.168.50.254 converte esses broadcasts em mensagens unicast direcionadas diretamente ao IP do servidor.
+> Mecanismo do DHCP Relay: Como o Server-DHCP se encontra fisicamente na VLAN 50, os pedidos de DHCP (broadcasts) emitidos pelas VLANs 10, 20 e 30 são descartados pelo router por omissão. O comando ip helper-address 172.17.50.0 converte esses broadcasts em mensagens unicast direcionadas diretamente ao IP do servidor.
 
 ```bash
 Router0> enable
@@ -287,7 +287,7 @@ Router0(config)# interface gigabitEthernet 0/0.10
 Router0(config-subif)# encapsulation dot1Q 10
 
 Router0(config-subif)# ip address 192.168.10.1 255.255.255.0
-Router0(config-subif)# ip helper-address 192.168.50.254
+Router0(config-subif)# ip helper-address 172.17.50.0
 
 Router0(config-subif)# exit
 ```
@@ -298,7 +298,7 @@ Router0(config)# interface gigabitEthernet 0/0.20
 Router0(config-subif)# encapsulation dot1Q 20
 
 Router0(config-subif)# ip address 192.168.20.1 255.255.255.0
-Router0(config-subif)# ip helper-address 192.168.50.254
+Router0(config-subif)# ip helper-address 172.17.50.0
 
 Router0(config-subif)# exit
 ```
@@ -309,7 +309,7 @@ Router0(config)# interface gigabitEthernet 0/0.30
 Router0(config-subif)# encapsulation dot1Q 30
 
 Router0(config-subif)# ip address 192.168.30.1 255.255.255.0
-Router0(config-subif)# ip helper-address 192.168.50.254
+Router0(config-subif)# ip helper-address 172.17.50.0
 
 Router0(config-subif)# exit
 ```
@@ -352,7 +352,7 @@ show running-config | include helper-address
 
 | Ip Address | Subnet Mask | Default Gateway |
 |:---:|:---:|:---:|
-| 192.168.50.254 | 255.255.255.0 | 192.168.50.1 |
+| 172.17.50.0 | 255.255.255.0 | 192.168.50.1 |
 
 
 `Services -> DHCP` : **ON**
@@ -574,9 +574,9 @@ ssh -l admin 192.168.50.2
 
 [ ] Router-on-a-Stick: Sub-interfaces Gi0/0.10, Gi0/0.20, Gi0/0.30, Gi0/0.40 e  Gi0/0.50 (`encapsulation dot1Q 40 native`) ativas no Router0.
 
-[ ] DHCP Relay: Comando ip helper-address 192.168.50.254 aplicado em Gi0/0.20 e Gi0/0.30 e  Gi0/0.10.
+[ ] DHCP Relay: Comando ip helper-address 172.17.50.0 aplicado em Gi0/0.20 e Gi0/0.30 e  Gi0/0.10.
 
-[ ] Server-DHCP: IP fixo 192.168.50.254/24 definido e 4 pools ativos (VLAN 10, VLAN 20, VLAN 30 e VLAN 50).
+[ ] Server-DHCP: IP fixo 172.17.50.0/24 definido e 4 pools ativos (VLAN 10, VLAN 20, VLAN 30 e VLAN 50).
 
 [ ] Endereçamento: Todos os PCs a obter IP e Gateway dinamicamente via DHCP.
 
