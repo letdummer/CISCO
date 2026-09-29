@@ -1,0 +1,568 @@
+# Guia de Configuração — VLANs, Trunk, VLAN Native 40, ROAS e SSH/TELNET (Cisco Packet Tracer)
+
+## Índice
+
+1. [Topologia e Endereçamento](#1-topologia-e-endereçamento)
+2. [Passo a Passo no Cisco IOS](#2-passo-a-passo-no-cisco-ios)
+   - [Tópico 1 — Criar VLANs](#-tópico-1--criar-vlans)
+   - [Tópico 2 — Portas de acesso, trunk e VLAN nativa](#-tópico-2--portas-de-acesso-trunk-e-vlan-nativa)
+   - [Tópico 3 — Router-on-a-Stick e DHCP-Relay](#-tópico-3--router-on-a-stick-e-dhcp-relay)
+   - [Tópico 4 — Configuração do DHCP e Pools](#-tópico-4--configuração-do-server-dhcp-e-pools)
+   - [Tópico 5 — VLAN 999 e SSH](#-tópico-5--vlan-999-e-ssh)
+   - [Tópico 6 — PC na Fa0/10 com VLAN 999 e Porta do Server-DHCP](#-tópico-6--pc-na-fa010-com-vlan-999-e-porta-server-dhcp)
+   - [Tópico 7 — Fechar portas](#-tópico-7--fechar-portas)
+   - [Testar SSH](#-testar-o-acesso-ssh)
+3. [Checklist rápido](#4-checklist-rápido)
+
+---
+
+# 1. Topologia e Endereçamento
+
+### » Dispositivos
+
+| Dispositivo | Função |
+|---|---|
+| `Switch0` | Switch central (distribuição) — liga Switch1, Switch2, Router0, Server-DHCP e PC-Gestao |
+| `Switch1` | Switch de acesso — liga PC0, PC1, PC2 |
+| `Switch2` | Switch de acesso — liga PC3, PC4, PC5 |
+| `Router0` | Router-on-a-Stick — faz o routing inter-VLAN |
+| `Server-DHCP` | Servidor DHCP na VLAN 10 para todas sub-redes |
+| `PC-Gestao` | PC de gestão na VLAN 999 |
+| `PC0`–`PC5` | Terminais dos utilizadores |
+
+### » Diagrama
+
+```
+                      [ Router0 ]
+                        (Gi0/0)        
+                          |       -(trunk / ROAS)        
+                          |    
+                       (Fa0/1) 
+                     [ Switch0 ]         -(central)
+            (Fa0/2)          (Fa0/3)            (Fa0/24)              (Fa0/10) 
+               /               |                  \                    \
+              /[trunk]         |[trunk]            \[acesso]            \[acesso]
+             /                 |                    \                    \
+        (Fa0/24)             (Fa0/24)               (Fa0)                (Fa0)
+      [ Switch1 ]           [ Switch2 ]           [ Server-DHCP ]     [ Pc-Gestao ] 
+   Fa0/1: PC0 (V10)       Fa0/1: PC3 (V30)
+   Fa0/2: PC1 (V20)       Fa0/2: PC4 (V20)
+   Fa0/3: PC2 (V30)       Fa0/3: PC5 (V10)
+```
+
+> 📌 Todos os links trunk (Router0↔Switch0, Switch0↔Switch1, Switch0↔Switch2) usam a **VLAN 40 como VLAN nativa** (tráfego sem tag 802.1Q).
+
+### » VLANs, sub-redes e gateway
+
+| VLAN | Nome | Sub-rede | Máscara | Gateway (`Router0`) |
+|:---:|:---|:---|:---|:---|
+| `10` | Estudantes | `192.168.10.0` | `/24` | `192.168.10.1` |
+| `20` | Professores | `192.168.20.0` | `/24` | `192.168.20.1` |
+| `30` | Direcao | `192.168.30.0` | `/24` | `192.168.30.1` |
+| `40` | Native | `192.168.40.0` | `/24` | `192.168.40.1` *(sub-interface nativa)* |
+| `999` | Gestao | `10.99.99.0` | `/24` | `10.99.99.254` |
+
+> 📌 **Nota (VLAN 40):** a VLAN 40 é a **VLAN nativa** dos trunks. Não tem PCs nem pool DHCP; existe apenas para transportar tráfego sem tag (ex.: CDP/STP). No `Router0` a sub-interface `Gi0/0.40` é criada com `encapsulation dot1Q 40 native`. A VLAN 1 deixa de ser usada como nativa (boa prática de segurança).
+
+### » Endereços IP dos PCs
+
+| PC | VLAN | Método | Endereço IP | Máscara | Gateway |
+|---|:---:|---|---|:---|---|
+| `PC0` | 10 | `DHCP` | `192.168.10.x` | `/24` | `192.168.10.1` |
+| `PC5` | 10 | `DHCP`  | `192.168.10.x` | `/24` | `192.168.10.1` |
+| `PC1` | 20 | `DHCP`  | `192.168.20.x` | `/24` | `192.168.20.1` |
+| `PC4` | 20 | `DHCP`  | `192.168.20.x` | `/24` | `192.168.20.1` |
+| `PC2` | 30 | `DHCP` | `192.168.30.x` | `/24` | `192.168.30.1` |
+| `PC3` | 30 | `DHCP`  | `192.168.30.x` | `/24` | `192.168.30.1` |
+| `Server-DHCP` | `10` | `Estático`  | `192.168.10.254` | `/24` | `192.168.10.1` |
+| `PC-Gestao` | `999` | `Estático` | `10.99.99.10` | `/24` | `10.99.99.254` |
+
+---
+
+# 2. Passo a Passo no Cisco IOS
+
+## » Tópico 1 — Criar VLANs
+
+Criação manual das VLANs. Configurar em `Switch0`, `Switch1` e `Switch2`:
+
+```bash
+enable
+configure terminal
+vlan 10
+ name Estudantes
+vlan 20
+ name Professores
+vlan 30
+ name Direcao
+vlan 40
+ name Native
+vlan 999
+ name Gestao
+vlan 99
+ name Portas_Inativas
+exit
+write memory
+```
+
+**Teste:**
+```
+show vlan brief
+```
+
+
+---
+
+## » Tópico 2 — Portas de acesso, trunk e VLAN nativa
+
+**Switch Central (Switch0)**
+
+Trunk para o Router0 (Fa0/1), Switch1 (Fa0/2) e Switch2 (Fa0/3), com **VLAN 40 como nativa**
+
+> ⚠️ A VLAN 40 tem de existir no switch (Tópico 1) e a VLAN nativa tem de ser **igual nas duas pontas** de cada trunk, caso contrário o STP/CDP reporta *native VLAN mismatch*.
+
+```bash
+Switch0(config)# interface range fastEthernet 0/1-3
+Switch0(config-if-range)# switchport mode trunk
+Switch0(config-if-range)# switchport trunk allowed vlan 10,20,30,40,999
+Switch0(config-if-range)# switchport trunk native vlan 40
+Switch0(config-if-range)# switchport nonegotiate
+Switch0(config-if-range)# no shutdown
+Switch0(config-if-range)# exit
+Switch0# write memory
+```
+
+
+**Switch de Acesso (SW-01)**
+<details>
+
+Trunk
+
+```
+Switch1(config)# interface fastEthernet 0/24
+Switch1(config-if)# switchport mode trunk
+Switch1(config-if)# switchport trunk allowed vlan 10,20,30,40,999
+Switch1(config-if)# switchport trunk native vlan 40
+Switch1(config-if-range)# switchport nonegotiate
+Switch1(config-if)# no shutdown
+Switch1(config-if)# exit
+```
+
+**Portas de acesso aos PCs**
+
+```
+Switch1(config)# interface fastEthernet 0/1
+Switch1(config-if)# switchport mode access
+Switch1(config-if)# switchport access vlan 10
+Switch1(config-if)# no shutdown
+Switch1(config-if)# exit
+
+Switch1(config)# interface fastEthernet 0/2
+Switch1(config-if)# switchport mode access
+Switch1(config-if)# switchport access vlan 20
+Switch1(config-if)# no shutdown
+Switch1(config-if)# exit
+
+Switch1(config)# interface fastEthernet 0/3
+Switch1(config-if)# switchport mode access
+Switch1(config-if)# switchport access vlan 30
+Switch1(config-if)# no shutdown
+Switch1(config-if)# exit
+
+Switch1(config)# exit
+Switch1# write memory
+```
+</details>
+
+
+**Switch de Acesso (SW-02)**
+
+<Details>
+
+```
+Switch2(config)# interface fastEthernet 0/24
+Switch2(config-if)# switchport mode trunk
+Switch2(config-if)# switchport trunk allowed vlan 10,20,30,40,999
+Switch2(config-if)# switchport trunk native vlan 40
+Switch2(config-if-range)# switchport nonegotiate
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+```
+
+**Portas de acesso** aos PCs no Switch2
+```
+Switch2(config)# interface fastEthernet 0/1
+Switch2(config-if)# switchport mode access
+Switch2(config-if)# switchport access vlan 10
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+
+Switch2(config)# interface fastEthernet 0/2
+Switch2(config-if)# switchport mode access
+Switch2(config-if)# switchport access vlan 20
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+
+Switch2(config)# interface fastEthernet 0/3
+Switch2(config-if)# switchport mode access
+Switch2(config-if)# switchport access vlan 30
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+```
+
+```
+Switch2(config)# exit
+Switch2# write memory
+```
+
+</Details>
+
+**Confirmação de mudanças:**
+
+```
+show interfaces trunk
+```
+
+> ✅ Na coluna **Native vlan** deve aparecer `40` em todas as portas trunk (Fa0/1-3 no Switch0 e Fa0/24 no Switch1 e Switch2). A VLAN 40 deve constar em *VLANs allowed and active in management domain*.
+
+<!--
+| Port | Mode | Encapsulation | Status | Nativa vlan |
+|:----:|:----:|:-------------:|:------:|:-----------:|
+| `fa0/2` | `on` | `802.1q` | `/trunking` | `1` |
+-->
+
+---
+
+## » Tópico 3 — Router-on-a-Stick e DHCP-Relay
+
+> Mecanismo do DHCP Relay: Como o Server-DHCP se encontra fisicamente na VLAN 10, os pedidos de DHCP (broadcasts) emitidos pelas VLANs 20 e 30 são descartados pelo router por omissão. O comando ip helper-address 192.168.10.254 converte esses broadcasts em mensagens unicast direcionadas diretamente ao IP do servidor.
+
+```bash
+Router0> enable
+Router0# configure terminal
+
+Router0(config)# interface gigabitEthernet 0/0
+Router0(config-if)# no shutdown
+Router0(config-if)# exit
+```
+
+**VLAN 10 (Estudantes)**
+```bash
+Router0(config)# interface gigabitEthernet 0/0.10
+Router0(config-subif)# encapsulation dot1Q 10
+
+Router0(config-subif)# ip address 192.168.10.1 255.255.255.0
+
+Router0(config-subif)# exit
+```
+
+**VLAN 20 (Professores) — com DHCP Relay**
+```bash
+Router0(config)# interface gigabitEthernet 0/0.20
+Router0(config-subif)# encapsulation dot1Q 20
+
+Router0(config-subif)# ip address 192.168.20.1 255.255.255.0
+
+Router0(config-subif)# ip helper-address 192.168.10.254
+Router0(config-subif)# exit
+```
+
+**VLAN 30 — com DHCP Relay**
+```bash
+Router0(config)# interface gigabitEthernet 0/0.30
+Router0(config-subif)# encapsulation dot1Q 30
+
+Router0(config-subif)# ip address 192.168.30.1 255.255.255.0
+
+Router0(config-subif)# ip helper-address 192.168.10.254
+Router0(config-subif)# exit
+```
+
+**VLAN 40 (Native) — sem DHCP Relay**
+```bash
+Router0(config)# interface gigabitEthernet 0/0.40
+Router0(config-subif)# encapsulation dot1Q 40 native
+
+Router0(config-subif)# ip address 192.168.40.1 255.255.255.0
+
+Router0(config-subif)# exit
+Router0(config)# exit
+Router0# write memory
+```
+
+**VLAN 999 (Gestão) — Criar presença do router na rede de gestão**
+```
+Router0(config)# interface gigabitEthernet 0/0.999
+Router0(config-subif)# encapsulation dot1Q 999
+Router0(config-subif)# ip address 10.99.99.254 255.255.255.0
+Router0(config-subif)# exit
+Router0(config)# exit
+Router0# write memory
+```
+
+
+> 📌 A palavra-chave `native` na sub-interface indica ao router que o tráfego da VLAN 40 circula **sem tag**, em coerência com `switchport trunk native vlan 40` nos switches. Não é necessário `ip helper-address`, pois não há PCs nesta VLAN.
+
+---
+
+## » Tópico 4 — Configuração do Server-DHCP e Pools
+
+**Configuração Manual do Server-DHCP | IP Estático**
+
+`Clicar no Server -> Desktop -> Ip Configuration`
+
+| Ip Address | Subnet Mask | Default Gateway |
+|:---:|:---:|:---:|
+| 192.168.10.254 | 255.255.255.0 | 192.168.10.1 |
+
+
+`Services -> DHCP` : **ON**
+
+| Pool | Default Gateway | Start IP Address | Subnet Mask |
+|:-------:|:------------:|:-------------:|:---:|
+| VLAN 10 | 192.168.10.1 | 192.168.10.50 | 255.255.255.0 |
+| VLAN 20 | 192.168.20.1 | 192.168.20.50 | 255.255.255.0 |
+| VLAN 30 | 192.168.30.1 | 192.168.30.50 | 255.255.255.0 |
+
+**ATRIBUIR IP AOS PCS**
+
+Em cada PC, [ 0 - 5 ]
+`Desktop - > IP Configuration`
+ativar `DHCP`
+
+
+
+---
+
+## » Tópico 5 — VLAN 999 e SSH
+
+> A VLAN 999 já foi criada no Tópico 1. Confirmar com `show vlan brief` em cada switch.
+
+**1. Endereçamento das interfaces virtuais (SVI) nos Switches:**
+
+```
+Switch0(config)# interface vlan 999
+Switch0(config-if)# ip address 10.99.99.1 255.255.255.0
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
+Switch0(config)# ip default-gateway 10.99.99.254
+Switch0# write memory
+```
+
+> Repetir em `Switch0`, `Switch1` e `Switch2`, mudando apenas o IP (pode acrescentar +1 ao ultimo digito).
+
+<details>
+   
+```
+Switch1(config)# interface vlan 999
+Switch1(config-if)# ip address 10.99.99.2 255.255.255.0
+Switch1(config-if)# no shutdown
+Switch1(config-if)# exit
+Switch1(config)# ip default-gateway 10.99.99.254
+Switch1# write memory
+```
+
+```
+Switch2(config)# interface vlan 999
+Switch2(config-if)# ip address 10.99.99.3 255.255.255.0
+Switch2(config-if)# no shutdown
+Switch2(config-if)# exit
+Switch2(config)# ip default-gateway 10.99.99.254
+Switch2# write memory
+```
+</details>
+
+### SSH / TELNET (configurar no SW0 e no Router (no laboratório, configurar só no SW0. No cenário real, configurar em todos SW):
+
+```bash
+enable
+configure terminal
+
+! 1. Domínio e Chave RSA para SSH:
+
+ip domain-name cinel.local
+crypto key generate rsa
+2048
+
+! 2. Autenticação Local e Modo Privilegiado:
+
+enable secret cinel
+username admin privilege 15 secret cinel
+
+! 3. Hardening Geral:
+
+service password-encryption
+banner motd # Acesso restrito! #
+
+! 4. Proteção da Porta de Consola:
+
+line console 0
+ login local
+ exec-timeout 5 0
+ logging synchronous
+ exit
+
+! NOVO: Criar a ACL para permitir apenas a rede de gestão
+access-list 10 permit 10.99.99.0 0.0.0.255
+
+! 5. Proteção das Linhas de Rede (SSH / Telnet):
+
+line vty 0 4
+ login local
+ transport input ssh telnet
+ access-class 10 in
+ exec-timeout 5 0
+ logging synchronous
+ exit
+
+write memory
+```
+
+<details>
+
+
+**Para testar:**
+
+`telnet 10.99.99.1`
+
+`ssh -l admin 10.99.99.1`
+
+
+
+**! Visualizar configurações ativas e resumo de interfaces**
+```
+Router# show running-config
+Router# show ip interface brief
+
+! Guardar alterações da RAM para a NVRAM
+Router# copy running-config startup-config
+
+! Atalho equivalente
+Router# write memory
+```
+</details>
+
+
+---
+
+## » Tópico 6 — PC na Fa0/10 com VLAN 999 e Porta Server-DHCP
+
+# SW-0
+
+**Porta do PC-Gestao (VLAN 999)**
+```bash
+Switch0(config)# interface fastEthernet 0/10
+Switch0(config-if)# switchport mode access
+Switch0(config-if)# switchport access vlan 999
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
+```
+
+
+**Porta do Server-DHCP (VLAN 10)**
+```
+Switch0(config)# interface fastEthernet 0/24
+Switch0(config-if)# switchport mode access
+Switch0(config-if)# switchport access vlan 10
+Switch0(config-if)# no shutdown
+Switch0(config-if)# exit
+Switch0# exit
+Switch0# write memory
+```
+
+---
+
+## » Tópico 7 — FECHAR PORTAS
+
+**SWITCH 0 (Switch Central):**
+- Portas em uso: `Fa0/1`, `Fa0/2`, `Fa0/3` (trunks). `Fa0/10` (Pc-Gestao) e `Fa0/24` (server-DHCP)
+- Portas para fechar: `Fa0/4-9`, `Fa0/11-23`, `Gi0/1-2`.
+
+> A VLAN 99 (Portas_Inativas) já foi criada no Tópico 1.
+
+**1. No Switch Central (Switch0)**
+
+``` 
+Switch0(config)# interface range fastEthernet 0/4-9, fastEthernet 0/11-23, gigabitEthernet 0/1-2
+Switch0(config-if-range)# switchport mode access
+Switch0(config-if-range)# switchport access vlan 99
+Switch0(config-if-range)# shutdown
+Switch0(config-if-range)# exit
+Switch0# write memory
+```
+
+
+
+**2. Nos Switches de Acesso (Switch1 e Switch2):**
+- Portas em uso: `Fa0/1`, `Fa0/2`, `Fa0/3` (PCs) e `Fa0/24` (trunk).
+- Portas para fechar: `Fa0/4-23`, `Gi0/1-2`.
+
+```
+Switch1(config)# interface range fastEthernet 0/4-23, gigabitEthernet 0/1-2
+Switch1(config-if-range)# switchport mode access
+Switch1(config-if-range)# switchport access vlan 99
+Switch1(config-if-range)# shutdown
+Switch1(config-if-range)# exit
+Switch1# write memory
+```
+
+`Repetir exatamente estes mesmos comandos no Switch2`
+
+
+**Como verificar a VLAN nativa e as sub-interfaces?**
+
+```
+Switch0# show interfaces trunk
+Router0# show ip interface brief
+Router0# show running-config | section Gi0/0.40
+```
+
+**Como verificar se as portas ficaram fechadas?**
+Usa o comando em modo privilegiado para ver o estado das interfaces:
+
+``` 
+show ip interface brief
+```
+
+
+
+
+
+### — Testar o acesso SSH
+
+**Teste 1 — a partir do `PC-Gestao` (VLAN 999):**
+```bash
+ssh -l admin 10.99.99.1
+```
+`password: cinel`
+
+> ✅ **Sucesso** — mesma VLAN 999 que as SVIs de gestão (transportada pelos trunks).
+
+**Teste 2 — a partir de um PC de outra VLAN (ex.: `PC0`, VLAN10):**
+```bash
+ssh -l admin 10.99.99.1
+```
+
+
+---
+
+# 3. Checklist rápido
+
+[ ] VLANs: VLANs 10, 20, 30, 40, 99 e 999 criadas em todos os switches.
+
+[ ] Trunks: Links Fa0/1-3 no Switch0 e Fa0/24 nos switches de acesso configurados em modo trunk.
+
+[ ] VLAN Nativa: `switchport trunk native vlan 40` aplicado em todos os trunks (Fa0/1-3 no Switch0, Fa0/24 no Switch1 e Switch2) e confirmado com `show interfaces trunk`.
+
+[ ] Acesso: Portas dos utilizadores associadas às respetivas VLANs.
+
+[ ] Router-on-a-Stick: Sub-interfaces Gi0/0.10, Gi0/0.20, Gi0/0.30 e Gi0/0.40 (`encapsulation dot1Q 40 native`) ativas no Router0.
+
+[ ] DHCP Relay: Comando ip helper-address 192.168.10.254 aplicado em Gi0/0.20 e Gi0/0.30.
+
+[ ] Server-DHCP: IP fixo 192.168.10.254/24 definido e os 3 pools ativos.
+
+[ ] Endereçamento: Todos os PCs a obter IP e Gateway dinamicamente via DHCP.
+
+[ ] Gestão & SSH: SVIs VLAN 999 ativas nos switches e SSH funcional a partir do PC-Gestao.
+
+[ ] Hardening: Passwords encriptadas, login local, banner e portas inativas na VLAN 99 com estado shutdown.
