@@ -91,11 +91,10 @@
    - configurar primeiro os links Trunk entre os switches
          ---> [Configuração Trunk](#-tópico-2--portas-de-acesso-trunk-e-vlan-nativa)
    - configurar o VTP Server (switch0, central)
-   - configurar o VTP Cliente (switch1 e switch2)
    - criar as vlans no switch central
+   - configurar o VTP Cliente (switch1 e switch2)
   
 <details>
-
 
 **1. Configurar o VTP Server (Switch0):**   
 ```
