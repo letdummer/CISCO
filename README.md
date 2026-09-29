@@ -255,7 +255,7 @@ Router0(config-subif)# ip address 192.168.10.1 255.255.255.0
 Router0(config-subif)# exit
 ```
 
-**VLAN 20 (Professores) — com DHCP Relay**
+**VLAN 20 — com DHCP Relay HELPER-ADDRESS**
 ```bash
 Router0(config)# interface gigabitEthernet 0/0.20
 Router0(config-subif)# encapsulation dot1Q 20
@@ -266,7 +266,7 @@ Router0(config-subif)# ip helper-address 192.168.10.254
 Router0(config-subif)# exit
 ```
 
-**VLAN 30 — com DHCP Relay**
+**VLAN 30 — com DHCP Relay HELPER-ADDRESS**
 ```bash
 Router0(config)# interface gigabitEthernet 0/0.30
 Router0(config-subif)# encapsulation dot1Q 30
