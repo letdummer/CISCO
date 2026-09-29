@@ -12,8 +12,7 @@
    - [Tópico 6 — PC na Fa0/10 com VLAN 999 e Porta do Server-DHCP](#-tópico-6--pc-na-fa010-com-vlan-999-e-porta-server-dhcp)
    - [Tópico 7 — Fechar portas](#-tópico-7--fechar-portas)
    - [Testar SSH](#-testar-o-acesso-ssh)
-3. [Resumo dos resultados esperados](#3-resumo-dos-resultados-esperados-com-router0-instalado)
-4. [Checklist rápido](#4-checklist-rápido)
+3. [Checklist rápido](#4-checklist-rápido)
 
 ---
 
@@ -35,15 +34,17 @@
 
 ```
                       [ Router0 ]
-                        (Gi0/0)          -(trunk / ROAS)
-                          |
+                        (Gi0/0)        
+                          |       -(trunk / ROAS)        
+                          |    
                        (Fa0/1) 
                      [ Switch0 ]         -(central)
-                /                |                \                 \
-            (Fa0/2)           (Fa0/3)           (Fa0/24)          (Fa0/10)
-              /                  |                  \           [ Pc-Gestao ] 
-             /                   |                   \
-      [ Switch1 ]           [ Switch2 ]        [ Server-DHCP ] (Fa0)
+            (Fa0/2)          (Fa0/3)            (Fa0/24)              (Fa0/10) 
+               /               |                  \                    \
+              /[trunk]         |[trunk]            \[acesso]            \[acesso]
+             /                 |                    \                    \
+        (Fa0/24)             (Fa0/24)               (Fa0)                (Fa0)
+      [ Switch1 ]           [ Switch2 ]           [ Server-DHCP ]     [ Pc-Gestao ] 
    Fa0/1: PC0 (V10)       Fa0/1: PC3 (V30)
    Fa0/2: PC1 (V20)       Fa0/2: PC4 (V20)
    Fa0/3: PC2 (V30)       Fa0/3: PC5 (V10)
@@ -59,11 +60,9 @@
 | `20` | Professores | `192.168.20.0` | `/24` | `192.168.20.1` |
 | `30` | Direcao | `192.168.30.0` | `/24` | `192.168.30.1` |
 | `40` | Native | `192.168.40.0` | `/24` | `192.168.40.1` *(sub-interface nativa)* |
-| `999` | Gestao | `10.0.0.0` | `/8` | — *(sem gateway, ver nota)* |
+| `999` | Gestao | `10.99.99.0` | `/24` | `10.99.99.254` |
 
 > 📌 **Nota (VLAN 40):** a VLAN 40 é a **VLAN nativa** dos trunks. Não tem PCs nem pool DHCP; existe apenas para transportar tráfego sem tag (ex.: CDP/STP). No `Router0` a sub-interface `Gi0/0.40` é criada com `encapsulation dot1Q 40 native`. A VLAN 1 deixa de ser usada como nativa (boa prática de segurança).
-
-> 📌 **Nota:** a VLAN 999 **não tem sub-interface** no router propositadamente, para a rede de gestão ficar isolada das VLANs de utilizador — isto mantém válidos os testes de SSH dos pontos 12 e 13 do enunciado.
 
 ### » Endereços IP dos PCs
 
@@ -76,7 +75,7 @@
 | `PC2` | 30 | `DHCP` | `192.168.30.x` | `/24` | `192.168.30.1` |
 | `PC3` | 30 | `DHCP`  | `192.168.30.x` | `/24` | `192.168.30.1` |
 | `Server-DHCP` | `10` | `DHCP`  | `192.168.10.254` | `/24` | `192.168.10.1` |
-| `PC-Gestao` | `999` | `Estático` | `/8` | `sem gateway` |
+| `PC-Gestao` | `999` | `Estático` | `10.99.99.10` | `/24` | `10.99.99.254` |
 
 ---
 
@@ -100,8 +99,8 @@
 ```
 Switch0> enable
 Switch0# configure terminal
-Switch0(config)# vtp domain cinel-domain
 Switch0(config)# vtp mode server
+Switch0(config)# vtp domain cinel-domain
 Switch0(config)# vtp password cinel
 ```
 
@@ -190,6 +189,7 @@ Trunk para o Router0 (Fa0/1), Switch1 (Fa0/2) e Switch2 (Fa0/3), com **VLAN 40 c
 Switch0(config)# interface range fastEthernet 0/1-3
 Switch0(config-if-range)# switchport mode trunk
 Switch0(config-if-range)# switchport trunk native vlan 40
+Switch0(config-if-range)# no negotiate
 Switch0(config-if-range)# no shutdown
 Switch0(config-if-range)# exit
 Switch0# write memory
@@ -354,9 +354,18 @@ Router0(config)# exit
 Router0# write memory
 ```
 
-> 📌 A palavra-chave `native` na sub-interface indica ao router que o tráfego da VLAN 40 circula **sem tag**, em coerência com `switchport trunk native vlan 40` nos switches. Não é necessário `ip helper-address`, pois não há PCs nesta VLAN.
+**VLAN 999 (Gestão) — Criar presença do router na rede de gestão**
+```
+Router0(config)# interface gigabitEthernet 0/0.999
+Router0(config-subif)# encapsulation dot1Q 999
+Router0(config-subif)# ip address 10.99.99.254 255.255.255.0
+Router0(config-subif)# exit
+Router0(config)# exit
+Router0# write memory
+```
 
-> 📌 A interface física `Gi0/0` **não** recebe IP quando se usam sub-interfaces — só precisa de `no shutdown`. Repara que a `Gi0/0.40` é a sub-interface **nativa** e que **não existe** `Gi0/0.999`: a VLAN de gestão fica fora do routing de propósito.
+
+> 📌 A palavra-chave `native` na sub-interface indica ao router que o tráfego da VLAN 40 circula **sem tag**, em coerência com `switchport trunk native vlan 40` nos switches. Não é necessário `ip helper-address`, pois não há PCs nesta VLAN.
 
 ---
 
@@ -402,9 +411,10 @@ Switch0(config-vlan)# exit
 
 ```
 Switch0(config)# interface vlan 999
-Switch0(config-if)# ip address 10.0.0.1 255.0.0.0
+Switch0(config-if)# ip address 10.99.99.1 255.255.255.0
 Switch0(config-if)# no shutdown
 Switch0(config-if)# exit
+Switch0(config)# ip default-gateway 10.99.99.254
 Switch0# write memory
 ```
 
@@ -415,7 +425,7 @@ Switch0# write memory
    
 ```
 Switch1(config)# interface vlan 999
-Switch1(config-if)# ip address 10.0.0.2 255.0.0.0
+Switch1(config-if)# ip address 10.99.99.2 255.255.255.0
 Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
 Switch1# write memory
@@ -423,14 +433,14 @@ Switch1# write memory
 
 ```
 Switch2(config)# interface vlan 999
-Switch2(config-if)# ip address 10.0.0.3 255.0.0.0
+Switch2(config-if)# ip address 10.99.99.3 255.255.255.0
 Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
 Switch2# write memory
 ```
 </details>
 
-### SSH / TELNET (repetir nos três switches e no Router):
+### SSH / TELNET (configurar no SW0 e no Router (no laboratório, configurar só no SW0. No cenário real, configurar em todos SW):
 
 ```bash
 enable
@@ -460,11 +470,15 @@ line console 0
  logging synchronous
  exit
 
+! NOVO: Criar a ACL para permitir apenas a rede de gestão
+access-list 10 permit 10.99.99.0 0.0.0.255
+
 ! 5. Proteção das Linhas de Rede (SSH / Telnet):
 
 line vty 0 4
  login local
  transport input ssh telnet
+ access-class 10 in
  exec-timeout 5 0
  logging synchronous
  exit
@@ -479,7 +493,7 @@ write memory
 
 `telnet 10.0.0.1`
 
-`ssh -l admin 10.0.0.1`
+`ssh -l admin 10.99.99.1`
 
 
 
@@ -542,7 +556,7 @@ Switch0(config-vlan)# exit
 **1. No Switch Central (Switch0)**
 
 ``` 
-Switch0(config)# interface range fastEthernet 0/4 - 9 , fastEthernet 0/11 - 23 , gigabitEthernet 0/1 - 2
+Switch0(config)# interface range fastEthernet 0/4-9 , fastEthernet 0/11-23 , gigabitEthernet 0/1-2
 Switch0(config-if-range)# switchport mode access
 Switch0(config-if-range)# switchport access vlan 99
 Switch0(config-if-range)# shutdown
@@ -598,7 +612,7 @@ show ip interface brief
 
 **Teste 1 — a partir do `PC-Gestao` (VLAN 999):**
 ```bash
-ssh -l admin 10.0.0.1
+ssh -l admin 10.99.99.1
 ```
 `password: cinel`
 
@@ -606,27 +620,14 @@ ssh -l admin 10.0.0.1
 
 **Teste 2 — a partir de um PC de outra VLAN (ex.: `PC0`, VLAN10):**
 ```bash
-ssh -l admin 10.0.0.1
+ssh -l admin 10.99.99.1
 ```
 
 > ❌ **Falha** (`Destination host unreachable`) — mesmo com o `Router0` instalado, porque não existe `Gi0/0.999`; a rede 10.0.0.0/8 continua sem rota a partir das VLANs de utilizador.
 
 ---
 
-# 3. Resumo dos resultados esperados (com Router0 instalado)
-
-| Ponto do enunciado | Resultado a observar/reportar |
-|---|---|
-| 8a. `PC5` ↔ `PC0` | ✅ Sucesso (mesma VLAN10, via trunk) |
-| 8b. `PC1` ↔ `PC5` | ✅ **Sucesso** agora que existe o `Router0` *(antes falhava)* |
-| 8c. `PC2` ↔ `PC3` | ✅ Sucesso (mesma VLAN30, via trunk) |
-| 12. SSH do PC da VLAN999 | ✅ Sucesso — mesmo domínio L2 da gestão |
-| 13. SSH de um PC de outra VLAN | ❌ Falha — VLAN 999 sem sub-interface no router |
-| Trunks (`show interfaces trunk`) | ✅ Native vlan = `40` em todos os trunks, sem *native VLAN mismatch* |
-
----
-
-# 4. Checklist rápido
+# 3. Checklist rápido
 
 [ ] VLANs: VLANs 10, 20, 30, 40, 99 e 999 criadas em todos os switches.
 
