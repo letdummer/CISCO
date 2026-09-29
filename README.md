@@ -237,7 +237,6 @@ show interfaces trunk
 
 ## » Tópico 3 — Portas do PC-Gestao e do Server-DHCP
 
-> ⚠️ **Fazer isto antes de configurar o router e o DHCP.** Se a Fa0/24 (Server-DHCP) ou a Fa0/10 (PC-Gestao) ficarem na VLAN 1 (por omissão), os pedidos DHCP dos PCs nunca chegam ao servidor. Configurar sempre **todas** as portas de acesso antes de avançar.
 
 **Switch0 (Switch Central)**
 
@@ -575,7 +574,7 @@ ssh -l admin 10.99.99.1
 
 # 3. Checklist rápido
 
-[ ] VLANs: VLANs 10, 20, 30, 40, 99 e 999 criadas em todos os switches.
+[ ] VLANs: VLANs 10, 20, 30, 40, 50, 99 e 999 criadas em todos os switches.
 
 [ ] Trunks: Links Fa0/1-3 no Switch0 e Fa0/24 nos switches de acesso configurados em modo trunk.
 
@@ -583,13 +582,13 @@ ssh -l admin 10.99.99.1
 
 [ ] Acesso: Portas dos utilizadores associadas às respetivas VLANs.
 
-[ ] Portas do Switch0: Fa0/10 (PC-Gestao) na VLAN 999 e Fa0/24 (Server-DHCP) na VLAN 10, confirmado com `show vlan brief`.
+[ ] Portas do Switch0: Fa0/10 (PC-Gestao) na VLAN 999 e Fa0/24 (Server-DHCP) na VLAN 50, confirmado com `show vlan brief`.
 
-[ ] Router-on-a-Stick: Sub-interfaces Gi0/0.10, Gi0/0.20, Gi0/0.30 e Gi0/0.40 (`encapsulation dot1Q 40 native`) ativas no Router0.
+[ ] Router-on-a-Stick: Sub-interfaces Gi0/0.10, Gi0/0.20, Gi0/0.30, Gi0/0.40 e  Gi0/0.50 (`encapsulation dot1Q 40 native`) ativas no Router0.
 
-[ ] DHCP Relay: Comando ip helper-address 192.168.50.254 aplicado em Gi0/0.20 e Gi0/0.30.
+[ ] DHCP Relay: Comando ip helper-address 192.168.50.254 aplicado em Gi0/0.20 e Gi0/0.30 e  Gi0/0.10.
 
-[ ] Server-DHCP: IP fixo 192.168.10.254/24 definido e os 3 pools ativos, sem sobreposição (`serverPool` ajustado para a VLAN 10).
+[ ] Server-DHCP: IP fixo 192.168.50.254/24 definido e os 3 pools ativos, sem sobreposição.
 
 [ ] Endereçamento: Todos os PCs a obter IP e Gateway dinamicamente via DHCP.
 
