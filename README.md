@@ -8,7 +8,7 @@
    - [Tópico 2 — Portas de acesso, trunk e VLAN nativa](#-tópico-2--portas-de-acesso-trunk-e-vlan-nativa)
    - [Tópico 3 — Portas do PC-Gestao e do Server-DHCP](#-tópico-3--portas-do-pc-gestao-e-do-server-dhcp)
    - [Tópico 4 — Router-on-a-Stick e DHCP-Relay](#-tópico-4--router-on-a-stick-e-dhcp-relay)
-   - [Tópico 5 — Configuração do DHCP e Pools](#-tópico-5--configuração-do-server-dhcp-e-pools)
+   - [Tópico 5 — Configuração do Server-DHCP e Pools](#-tópico-5--configuração-do-server-dhcp-e-pools)
    - [Tópico 6 — VLAN 50 e SSH](#-tópico-6--vlan-50-e-ssh)
    - [Tópico 7 — Fechar portas](#-tópico-7--fechar-portas)
    - [Testar SSH](#-testar-o-acesso-ssh)
@@ -270,7 +270,7 @@ show vlan brief
 
 ## » Tópico 4 — Router-on-a-Stick e DHCP-Relay
 
-> Mecanismo do DHCP Relay: Como o Server-DHCP se encontra fisicamente na VLAN 10, os pedidos de DHCP (broadcasts) emitidos pelas VLANs 20 e 30 são descartados pelo router por omissão. O comando ip helper-address 192.168.50.254 converte esses broadcasts em mensagens unicast direcionadas diretamente ao IP do servidor.
+> Mecanismo do DHCP Relay: Como o Server-DHCP se encontra fisicamente na VLAN 50, os pedidos de DHCP (broadcasts) emitidos pelas VLANs 10, 20 e 30 são descartados pelo router por omissão. O comando ip helper-address 192.168.50.254 converte esses broadcasts em mensagens unicast direcionadas diretamente ao IP do servidor.
 
 ```bash
 Router0> enable
@@ -375,9 +375,9 @@ ativar `DHCP`
 
 ---
 
-## » Tópico 6 — VLAN 60 e SSH
+## » Tópico 6 — VLAN 50 e SSH
 
-> A VLAN 60 já foi criada no Tópico 1. Confirmar com `show vlan brief` em cada switch.
+> A VLAN 50 já foi criada no Tópico 1. Confirmar com `show vlan brief` em cada switch.
 
 **1. Endereçamento das interfaces virtuais (SVI) nos Switches:**
 
@@ -562,7 +562,7 @@ ssh -l admin 192.168.50.2
 
 # 3. Checklist rápido
 
-[ ] VLANs: VLANs 10, 20, 30, 40, 50, 99 e 50 criadas em todos os switches.
+[ ] VLANs: VLANs 10, 20, 30, 40, 50, 99 criadas em todos os switches.
 
 [ ] Trunks: Links Fa0/1-3 no Switch0 e Fa0/24 nos switches de acesso configurados em modo trunk.
 
@@ -576,7 +576,7 @@ ssh -l admin 192.168.50.2
 
 [ ] DHCP Relay: Comando ip helper-address 192.168.50.254 aplicado em Gi0/0.20 e Gi0/0.30 e  Gi0/0.10.
 
-[ ] Server-DHCP: IP fixo 192.168.50.254/24 definido e os 3 pools ativos, sem sobreposição.
+[ ] Server-DHCP: IP fixo 192.168.50.254/24 definido e 4 pools ativos (VLAN 10, VLAN 20, VLAN 30 e VLAN 50).
 
 [ ] Endereçamento: Todos os PCs a obter IP e Gateway dinamicamente via DHCP.
 
