@@ -190,7 +190,7 @@ Switch0(config)# interface range fastEthernet 0/1-3
 Switch0(config-if-range)# switchport mode trunk
 Switch0(config-if-range)# switchport trunk allowed vlan 10,20,30,40,999
 Switch0(config-if-range)# switchport trunk native vlan 40
-Switch0(config-if-range)# no negotiate
+Switch0(config-if-range)# switchport nonegotiate
 Switch0(config-if-range)# no shutdown
 Switch0(config-if-range)# exit
 Switch0# write memory
@@ -207,6 +207,7 @@ Switch1(config)# interface fastEthernet 0/24
 Switch1(config-if)# switchport mode trunk
 Switch1(config-if)# switchport trunk allowed vlan 10,20,30,40,999
 Switch1(config-if)# switchport trunk native vlan 40
+Switch1(config-if-range)# switchport nonegotiate
 Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
 ```
@@ -246,7 +247,9 @@ Trunk para o SW0
 ```
 Switch2(config)# interface fastEthernet 0/24
 Switch2(config-if)# switchport mode trunk
+Switch2(config-if)# switchport trunk allowed vlan 10,20,30,40,999
 Switch2(config-if)# switchport trunk native vlan 40
+Switch2(config-if-range)# switchport nonegotiate
 Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
 ```
@@ -430,6 +433,7 @@ Switch1(config)# interface vlan 999
 Switch1(config-if)# ip address 10.99.99.2 255.255.255.0
 Switch1(config-if)# no shutdown
 Switch1(config-if)# exit
+Switch1(config)# ip default-gateway 10.99.99.254
 Switch1# write memory
 ```
 
@@ -438,6 +442,7 @@ Switch2(config)# interface vlan 999
 Switch2(config-if)# ip address 10.99.99.3 255.255.255.0
 Switch2(config-if)# no shutdown
 Switch2(config-if)# exit
+Switch2(config)# ip default-gateway 10.99.99.254
 Switch2# write memory
 ```
 </details>
@@ -625,7 +630,6 @@ ssh -l admin 10.99.99.1
 ssh -l admin 10.99.99.1
 ```
 
-> ❌ **Falha** (`Destination host unreachable`) — mesmo com o `Router0` instalado, porque não existe `Gi0/0.999`; a rede 10.0.0.0/8 continua sem rota a partir das VLANs de utilizador.
 
 ---
 
