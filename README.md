@@ -74,7 +74,7 @@
 | `PC4` | 20 | `DHCP`  | `192.168.20.x` | `/24` | `192.168.20.1` |
 | `PC2` | 30 | `DHCP` | `192.168.30.x` | `/24` | `192.168.30.1` |
 | `PC3` | 30 | `DHCP`  | `192.168.30.x` | `/24` | `192.168.30.1` |
-| `Server-DHCP` | `10` | `DHCP`  | `192.168.10.254` | `/24` | `192.168.10.1` |
+| `Server-DHCP` | `10` | `Estático`  | `192.168.10.254` | `/24` | `192.168.10.1` |
 | `PC-Gestao` | `999` | `Estático` | `10.99.99.10` | `/24` | `10.99.99.254` |
 
 ---
@@ -498,7 +498,7 @@ write memory
 
 **Para testar:**
 
-`telnet 10.0.0.1`
+`telnet 10.99.99.1`
 
 `ssh -l admin 10.99.99.1`
 
@@ -563,7 +563,7 @@ Switch0(config-vlan)# exit
 **1. No Switch Central (Switch0)**
 
 ``` 
-Switch0(config)# interface range fastEthernet 0/4-9 , fastEthernet 0/11-23 , gigabitEthernet 0/1-2
+Switch0(config)# interface range fastEthernet 0/4-9, fastEthernet 0/11-23, gigabitEthernet 0/1-2
 Switch0(config-if-range)# switchport mode access
 Switch0(config-if-range)# switchport access vlan 99
 Switch0(config-if-range)# shutdown
@@ -585,7 +585,7 @@ Switch1(config-vlan)# exit
 ```
 
 ```
-Switch1(config)# interface range fastEthernet 0/4-23 , gigabitEthernet 0/1-2
+Switch1(config)# interface range fastEthernet 0/4-23, gigabitEthernet 0/1-2
 Switch1(config-if-range)# switchport mode access
 Switch1(config-if-range)# switchport access vlan 99
 Switch1(config-if-range)# shutdown
