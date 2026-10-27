@@ -211,7 +211,9 @@ SW1(config-if)# switchport trunk allowed vlan 10,20,30,99  => especifica quais v
 SW1(config-if)# exit
 ```
 
-> Verificação: `show vlan brief`
+> Verificação:
+> `show interfaces status` => exibe "trunk" ou o numero da vlan associada à porta
+> `show vlan brief`
 > `show interfaces vlan 20`
 > `show interfaces trunk`
 > `show vlan name student`
