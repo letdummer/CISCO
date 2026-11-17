@@ -1,5 +1,5 @@
 # Guia Unificado — Cenário Cisco Packet Tracer
-**VLANs · Router-on-a-Stick · DHCP Relay · SSH**
+**VLANs · Router-on-a-Stick · DHCP Relay · SSH · Port Security · DHCP Snooping · DAI · AAA/802.1X**
 
 > Guia único, organizado **por equipamento e por ordem prática de execução**. Em cada passo indica-se claramente **em que equipamento** a configuração é feita. Quando a mesma configuração se repete noutro equipamento, é apresentada num bloco colapsado pronto a **copiar e colar**.
 
@@ -15,8 +15,12 @@
 6. [Router0 (ROAS + DHCP Relay)](#6-router0)
 7. [Server-DHCP (GUI)](#7-server)
 8. [PCs (DHCP)](#8-pcs)
-9. [Testes finais](#9-testes)
-10. [Checklist](#10-checklist)
+9. [Port Security](#9-port-security)
+10. [DHCP Snooping](#10-dhcp-snooping)
+11. [Dynamic ARP Inspection (DAI)](#11-dai)
+12. [AAA + 802.1X](#12-aaa-8021x)
+13. [Testes finais](#13-testes)
+14. [Checklist](#14-checklist)
 
 ---
 
@@ -107,6 +111,10 @@
 | 5 | **Server-DHCP** | IP estático + pools DHCP (interface gráfica) |
 | 6 | **PCs** | Ativar DHCP em cada PC |
 | 7 | **Testes finais** | Ping, SSH, verificações |
+| 8 | **Port Security** | Portas dos PCs: 1 MAC por porta, sticky, violação shutdown (Secção 9) |
+| 9 | **DHCP Snooping** | Todos os switches: trunks + porta do servidor trusted (Secção 10) |
+| 10 | **DAI** | Depende do DHCP Snooping + PCs já com IP (Secção 11) |
+| 11 | **AAA + 802.1X** | Em último lugar: porta bloqueia até autenticar no RADIUS (Secção 12) |
 
 > 📌 **Regra de ouro:** termina sempre cada equipamento com `write memory`.
 
@@ -1047,7 +1055,7 @@ write memory
 
 > A VLAN 40 **não tem pool** — não existe nela nenhum PC de utilizador.
 
-**Verificar:** nos passos 9/10, os PCs devem obter IP da sub-rede correta.
+**Verificar:** nos passos 8 e 13, os PCs devem obter IP da sub-rede correta.
 
 ---
 
@@ -1060,8 +1068,353 @@ write memory
 
 ---
 
-<a id="9-testes"></a>
-## 9. Testes finais
+<a id="9-port-security"></a>
+## 9. Port Security
+
+> Protege as **portas de acesso**: limita quantos endereços MAC podem transmitir numa porta (por defeito, 1). Impede que um utilizador ligue um switch/hub escondido ou falsifique MACs. Se um MAC não autorizado aparecer, a porta entra em **violação**.
+>
+> **Configurar em:** `Switch1` e `Switch2` (portas dos PCs — o mesmo bloco). Opcional no `Switch0` (Fa0/10 e Fa0/24).
+
+### 9.1 — [SW1] Port Security nas portas dos PCs
+
+> Requisito: a porta já tem de estar em modo **access** (passo 4.4) — o port-security não funciona em trunks.
+
+```
+interface range fastEthernet 0/1-3
+ switchport port-security
+ switchport port-security maximum 1
+ switchport port-security violation shutdown
+ switchport port-security mac-address sticky
+ exit
+end
+write memory
+```
+
+> 📌 **O que cada comando faz:**
+> - `switchport port-security` — ativa a segurança de porta (sem isto, nada mais se aplica).
+> - `maximum 1` — só 1 MAC é permitido (o valor por defeito).
+> - `violation shutdown` — em violação, a porta fica desativada (error-disabled) e o LED apaga.
+> - `mac-address sticky` — o MAC aprendido é gravado na running-config (persistente com `write memory`; sem `sticky`, o MAC é só dinâmico e perde-se ao reiniciar).
+
+**Modos de violação (alternativa ao `shutdown`):**
+
+| Modo | Comportamento |
+|:---|:---|
+| `shutdown` | (Por defeito) porta desativada por erro — LED apaga. Para recuperar: `shutdown` + `no shutdown` |
+| `restrict` | Descarta os pacotes do MAC desconhecido e regista a violação (log + LED) |
+| `protect` | Descarta os pacotes sem qualquer registo ou notificação |
+
+**Verificar:**
+```
+show port-security
+show port-security interface fa0/1
+show port-security address
+```
+> ✅ Fa0/1-3 devem aparecer `Secure-up` (ou `Secure-shutdown` se houve violação), modo `Shutdown`, e o MAC `sticky` deve constar nas entradas.
+
+**Se uma porta ficou em violação (error-disabled):**
+```
+interface fastEthernet 0/1
+ shutdown
+ no shutdown
+ exit
+```
+
+<details><summary><b>Script do Switch2 — idêntico ao Switch1, clique para abrir (copiar e colar)</b></summary>
+
+```
+interface range fastEthernet 0/1-3
+ switchport port-security
+ switchport port-security maximum 1
+ switchport port-security violation shutdown
+ switchport port-security mac-address sticky
+ exit
+end
+write memory
+```
+
+</details>
+
+<details><summary><b>Script do Switch0 — portas Fa0/10 e Fa0/24 (opcional, clique para abrir)</b></summary>
+
+```
+interface range fastEthernet 0/10, fastEthernet 0/24
+ switchport port-security
+ switchport port-security maximum 1
+ switchport port-security violation shutdown
+ switchport port-security mac-address sticky
+ exit
+end
+write memory
+```
+
+</details>
+
+---
+
+<a id="10-dhcp-snooping"></a>
+## 10. DHCP Snooping
+
+> Filtra as mensagens DHCP nas portas **untrusted** (todas, por defeito). Bloqueia:
+> - **DHCP starvation** — atacante inunda o servidor com pedidos DHCP falsos até esgotar o pool (negado de serviço aos restantes PCs);
+> - **DHCP poisoning** — um servidor DHCP ilegítimo responde aos clientes e atribui-lhes o gateway falso dele (ataque man-in-the-middle).
+>
+> **Configurar em TODOS os switches:** `Switch0`, `Switch1` e `Switch2`.
+> **Regra:** as portas **uplink/trunk** e a porta do servidor DHCP são **trusted**; as portas dos PCs ficam **untrusted** (por defeito — só se indica o que é trusted).
+
+### 10.1 — [SW0] DHCP Snooping (Switch Central)
+
+```
+configure terminal
+ip dhcp snooping
+ip dhcp snooping vlan 10,20,30,40
+no ip dhcp snooping information option
+
+! -> trunks (Router0, Switch1, Switch2): passam mensagens DHCP sem inspeção
+interface range fastEthernet 0/1-3
+ ip dhcp snooping trust
+ exit
+
+! -> porta do Server-DHCP (192.168.10.254): tem de ser trusted
+interface fastEthernet 0/24
+ ip dhcp snooping trust
+ exit
+end
+write memory
+```
+
+> 📌 `no ip dhcp snooping information option` — desativa a inserção da Option 82 (compatibilidade com o DHCP Relay do Packet Tracer; sem isto, o helper-address pode falhar).
+
+### 10.2 — [SW1] DHCP Snooping (Switch de Acesso)
+
+```
+configure terminal
+ip dhcp snooping
+ip dhcp snooping vlan 10,20,30,40
+no ip dhcp snooping information option
+
+! -> trunk para o Switch0: tem de ser trusted
+interface fastEthernet 0/24
+ ip dhcp snooping trust
+ exit
+end
+write memory
+```
+> As portas dos PCs (Fa0/1-3) ficam **untrusted** por defeito — é onde o snooping inspeciona as mensagens DHCP dos clientes (e descarta as mensagens de servidor, ex.: um PC a fazer-se passar por servidor DHCP).
+
+<details><summary><b>Script do Switch2 — idêntico ao Switch1, clique para abrir (copiar e colar)</b></summary>
+
+```
+configure terminal
+ip dhcp snooping
+ip dhcp snooping vlan 10,20,30,40
+no ip dhcp snooping information option
+
+interface fastEthernet 0/24
+ ip dhcp snooping trust
+ exit
+end
+write memory
+```
+
+</details>
+
+**Verificar (em todos os switches):**
+```
+show ip dhcp snooping
+show ip dhcp snooping binding
+```
+> ✅ `show ip dhcp snooping` deve indicar `DHCP snooping is enabled` nas VLANs 10/20/30/40. A **binding table** vai sendo preenchida à medida que os PCs obtêm IP (MAC ↔ IP ↔ porta). Se a tabela aparecer vazia, renova o DHCP num PC (`ipconfig /renew`) e volta a verificar.
+
+**(Opcional) Rate limiting** — limita mensagens DHCP por segundo nas portas untrusted (proteção extra contra starvation):
+```
+interface range fastEthernet 0/1-3
+ ip dhcp snooping limit rate 100
+ exit
+errdisable recovery cause dhcp-rate-limit
+```
+
+---
+
+<a id="11-dai"></a>
+## 11. Dynamic ARP Inspection (DAI)
+
+> Filtra as mensagens **ARP** nas portas untrusted, verificando se o par IP↔MAC da mensagem existe na **tabela de bindings do DHCP Snooping**. Bloqueia o **ARP poisoning** (man-in-the-middle): um atacante responde ARP em nome de outro dispositivo para desviar o tráfego.
+>
+> ⚠️ **Depende do DHCP Snooping** (Secção 10) — configura-o primeiro. A validação usa a binding table, por isso os PCs já têm de ter obtido IP via DHCP.
+>
+> **Configurar em TODOS os switches:** `Switch0`, `Switch1` e `Switch2`.
+
+### 11.1 — [SW0] DAI (Switch Central)
+
+```
+configure terminal
+ip arp inspection vlan 10,20,30,40
+
+! -> valida MAC de origem/destino e IP da mensagem ARP (todas as verificações no MESMO comando)
+ip arp inspection validate src-mac dst-mac ip
+
+! -> portas ligadas a equipamentos com IP estático ou infraestrutura: trusted
+interface range fastEthernet 0/1-3, fastEthernet 0/10, fastEthernet 0/24
+ ip arp inspection trust
+ exit
+end
+write memory
+```
+
+> 📌 O `PC-Gestao` (Fa0/10) e o `Server-DHCP` (Fa0/24) têm **IP estático** — não constam na binding table. Por isso as suas portas ficam **trusted** (em ambiente real usar-se-iam ARP ACLs). A DAI ativa-se diretamente nas VLANs — ao contrário do DHCP Snooping, que ativa primeiro globalmente e depois por VLAN.
+
+### 11.2 — [SW1] DAI (Switch de Acesso)
+
+```
+configure terminal
+ip arp inspection vlan 10,20,30,40
+ip arp inspection validate src-mac dst-mac ip
+
+! -> trunk para o Switch0: trusted
+interface fastEthernet 0/24
+ ip arp inspection trust
+ exit
+end
+write memory
+```
+> As portas dos PCs (Fa0/1-3) ficam **untrusted** — é onde o DAI inspeciona os ARP (o MAC/IP de cada PC tem de constar na binding table do DHCP snooping).
+
+<details><summary><b>Script do Switch2 — idêntico ao Switch1, clique para abrir (copiar e colar)</b></summary>
+
+```
+configure terminal
+ip arp inspection vlan 10,20,30,40
+ip arp inspection validate src-mac dst-mac ip
+
+interface fastEthernet 0/24
+ ip arp inspection trust
+ exit
+end
+write memory
+```
+
+</details>
+
+**Verificar (em todos os switches):**
+```
+show ip arp inspection interfaces
+show ip arp inspection statistics vlan 10
+show ip dhcp snooping binding
+```
+> ✅ `show ip arp inspection interfaces` deve mostrar `Trusted` nas portas de infraestrutura e `Untrusted` nas portas dos PCs. As estatísticas mostram ARP **forwarded** (válido) e **dropped** (bloqueado).
+
+**(Opcional) Rate limiting ARP** — por defeito, 15 pps nas portas untrusted; para ajustar:
+```
+interface fastEthernet 0/1
+ ip arp inspection limit rate 25 burst interval 2
+ exit
+```
+
+---
+
+<a id="12-aaa-8021x"></a>
+## 12. AAA + 802.1X (autenticação de portas)
+
+> **AAA** = **A**uthentication, **A**uthorization, **A**ccounting — framework que controla **quem entra** (autenticação), **o que pode fazer** (autorização, níveis 0-15) e **o que fez** (contabilização/logs). Até agora o guia usou **AAA local** (utilizadores definidos no próprio equipamento, ex.: `username admin` do SSH). Com o **802.1X**, a autenticação passa a ser feita por um **servidor RADIUS** central.
+
+> **802.1X** = controlo de acesso à porta, com 3 elementos:
+
+| Elemento | Neste cenário | Função |
+|:---|:---|:---|
+| **Supplicant** | PC0–PC5 | O cliente que pede acesso à rede |
+| **Authenticator** | Switch1 / Switch2 | Controla a porta física e reencaminha as credenciais ao servidor |
+| **Authentication Server** | Server-DHCP (serviço AAA/RADIUS) | Valida as credenciais e decide se a porta abre |
+
+> ⚠️ **Configurar em ÚLTIMO LUGAR**: enquanto a porta não está autorizada, só passa tráfego EAPOL — o DHCP dos PCs deixa de funcionar até se autenticarem. A porta só liberta tráfego após o RADIUS responder `EAP-Success`.
+
+### 12.1 — [SW1] 802.1X no Switch de Acesso
+
+```
+configure terminal
+aaa new-model
+radius-server host 192.168.10.254 key cinel
+aaa authentication dot1x default group radius
+dot1x system-auth-control
+
+! -> portas dos PCs: só abrem após autenticação RADIUS
+interface range fastEthernet 0/1-3
+ authentication port-control auto
+ dot1x pae authenticator
+ exit
+end
+write memory
+```
+
+> 📌 `aaa new-model` ativa o modelo AAA · `radius-server host ... key cinel` define o servidor e a chave secreta (tem de ser igual à do servidor) · `aaa authentication dot1x default group radius` define o método padrão do 802.1X · `dot1x system-auth-control` ativa o 802.1X globalmente.
+
+**Verificar:**
+```
+show dot1x
+show aaa servers
+```
+> ✅ `show dot1x` deve indicar as portas `Authorized`/`Unauthorized`. `show aaa servers` confirma o RADIUS configurado.
+
+### 12.2 — Servidor RADIUS (no `Server-DHCP`, interface gráfica)
+
+> Clicar no `Server-DHCP` → `Services → AAA` → **ON**:
+
+| Campo | Valor |
+|:---|:---|
+| **Clients (autenticadores)** | Name: `Switch1` · IP: `192.168.40.3` · Secret: `cinel` |
+| | Name: `Switch2` · IP: `192.168.40.4` · Secret: `cinel` |
+| **Users (utilizadores)** | Username: `aluno1` · Password: `cinel` |
+
+> 📌 O IP do client é a **SVI de gestão** do switch — é por aí que o switch fala com o servidor (via Router0). Verifica primeiro: `ping 192.168.10.254` a partir do switch.
+
+### 12.3 — Configurar os PCs (Supplicants)
+
+> Em **cada PC** (PC0 a PC5): `Config → FastEthernet0 → 802.1X Security` → Authentication: **MD5** → username `aluno1` e password `cinel` (os criados no servidor AAA).
+
+> ✅ Depois disto, a porta autentica e o PC volta a ter rede (renova o DHCP se preciso). Se um PC **não** tiver 802.1X ativado, a porta fica bloqueada e o PC não recebe IP — é o comportamento pretendido.
+
+<details><summary><b>Script do Switch2 — idêntico ao Switch1, clique para abrir (copiar e colar)</b></summary>
+
+```
+configure terminal
+aaa new-model
+radius-server host 192.168.10.254 key cinel
+aaa authentication dot1x default group radius
+dot1x system-auth-control
+
+interface range fastEthernet 0/1-3
+ authentication port-control auto
+ dot1x pae authenticator
+ exit
+end
+write memory
+```
+
+</details>
+
+<details><summary><b>Script do Switch0 (opcional — 802.1X na porta do PC-Gestao, clique para abrir)</b></summary>
+
+```
+configure terminal
+aaa new-model
+radius-server host 192.168.10.254 key cinel
+aaa authentication dot1x default group radius
+dot1x system-auth-control
+
+interface fastEthernet 0/10
+ authentication port-control auto
+ dot1x pae authenticator
+ exit
+end
+write memory
+```
+
+</details>
+
+---
+
+<a id="13-testes"></a>
+## 13. Testes finais
 
 **T1 — DHCP nos PCs:** em qualquer PC, `Desktop → Command Prompt` → `ipconfig` (ou o próprio painel de IP Configuration). Deve mostrar IP, máscara e gateway da VLAN correta.
 
@@ -1097,12 +1450,39 @@ show interfaces trunk
 ```
 > ✅ Coluna *Native vlan* = `40` em todos os trunks, sem mensagens de *native VLAN mismatch*.
 
+**T7 — Port Security:** em cada switch de acesso:
+```
+show port-security
+show port-security address
+```
+> ✅ Fa0/1-3 devem aparecer `Secure-up` com o MAC `sticky` de cada PC. **Teste de violação:** liga um segundo PC a uma porta — deve ficar `Secure-shutdown` (reativa com `shutdown` + `no shutdown`).
+
+**T8 — DHCP Snooping:** em cada switch:
+```
+show ip dhcp snooping
+show ip dhcp snooping binding
+```
+> ✅ Snooping ativo nas VLANs 10/20/30/40 e a binding table com uma entrada por PC (MAC ↔ IP ↔ interface).
+
+**T9 — DAI:** em cada switch:
+```
+show ip arp inspection interfaces
+show ip arp inspection statistics vlan 10
+```
+> ✅ Portas de infraestrutura `Trusted`, portas dos PCs `Untrusted`; estatísticas com ARP *forwarded* e *dropped*.
+
+**T10 — 802.1X:** a partir de qualquer PC:
+```
+ping 192.168.10.1
+```
+> ✅ Com 802.1X ativado no PC (supplicant), responde. Sem supplicant, o PC fica **sem rede** (porta `Unauthorized` — verifica com `show dot1x` no switch).
+
 ---
 
-<a id="10-checklist"></a>
-## 10. Checklist
+<a id="14-checklist"></a>
+## 14. Checklist
 
-- [ ] **Senhas:** `enable secret`, senha de consola e utilizador SSH configurados em Switch0/1/2 e Router0; service password-encryption` ativo
+- [ ] **Senhas:** `enable secret`, senha de consola e utilizador SSH configurados em Switch0/1/2 e Router0; `service password-encryption` ativo
 - [ ] **VLANs:** 10, 20, 30 e 40 criadas em Switch0, Switch1 e Switch2 (`show vlan brief`)
 - [ ] **Trunks:** Fa0/1-3 no Switch0 e Fa0/24 nos switches de acesso em modo trunk
 - [ ] **VLAN nativa 40:** `switchport trunk native vlan 40` em todos os trunks, confirmado com `show interfaces trunk`
@@ -1114,4 +1494,8 @@ show interfaces trunk
 - [ ] **DHCP Relay:** `ip helper-address 192.168.10.254` em Gi0/0.20 e Gi0/0.30
 - [ ] **Server-DHCP:** IP fixo `192.168.10.254/24` e pools das VLANs 10/20/30 ativos
 - [ ] **PCs:** todos os PC0–PC5 a obter IP via DHCP
-- [ ] **Testes:** ping entre VLANs ✓ · ping ao servidor ✓ · SSH a partir do PC-Gestao ✓
+- [ ] **Port Security:** `switchport port-security` + `sticky` + `violation shutdown` nas portas dos PCs (`show port-security address`)
+- [ ] **DHCP Snooping:** ativo nas VLANs 10/20/30/40 em todos os switches; trunks + porta do servidor **trusted**; Option 82 desativada (`show ip dhcp snooping binding`)
+- [ ] **DAI:** ativo nas VLANs 10/20/30/40; trunks + portas com IP estático **trusted**; `ip arp inspection validate src-mac dst-mac ip` (`show ip arp inspection statistics`)
+- [ ] **AAA/802.1X:** `aaa new-model` + RADIUS 192.168.10.254 nos switches; serviço AAA ativo no Server-DHCP (clients + users); PCs configurados como supplicants MD5 (`show dot1x`)
+- [ ] **Testes:** ping entre VLANs ✓ · ping ao servidor ✓ · SSH a partir do PC-Gestao ✓ · port-security / snooping / DAI / 802.1X verificados ✓
