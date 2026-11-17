@@ -1,5 +1,5 @@
 # Guia Unificado — Cenário Cisco Packet Tracer
-**VLANs 10/20/30 · VLAN Nativa 40 · Router-on-a-Stick · DHCP Relay · SSH**
+**VLANs · Router-on-a-Stick · DHCP Relay · SSH**
 
 > Guia único, organizado **por equipamento e por ordem prática de execução**. Em cada passo indica-se claramente **em que equipamento** a configuração é feita. Quando a mesma configuração se repete noutro equipamento, é apresentada num bloco colapsado pronto a **copiar e colar**.
 
@@ -7,7 +7,6 @@
 
 ## Índice
 
-0. [Lembretes IOS](#0-lembretes-ios)
 1. [Cenário: topologia e endereçamento](#1-cenário)
 2. [Ordem de configuração](#2-ordem)
 3. [Switch0 (central)](#3-switch0)
@@ -21,23 +20,7 @@
 
 ---
 
-<a id="0-lembretes-ios"></a>
-## 0. Lembretes IOS
 
-<details><summary><b>Modos, navegação e gravação (clique para abrir)</b></summary>
-
-| Modo | Prompt | Como entrar |
-|:---|:---|:---|
-| EXEC Utilizador | `Switch>` | (é o modo inicial) |
-| EXEC Privilegiado | `Switch#` | `enable` |
-| Config Global | `Switch(config)#` | `configure terminal` |
-| Config de Interface | `(config-if)#` | `interface ...` |
-
-- Recuar um nível: `exit` · Voltar direto ao modo privilegiado: `end` (ou `Ctrl+Z`)
-- **RAM** = `running-config` (perde-se ao desligar) · **NVRAM** = `startup-config` (persistente)
-- **Guardar sempre no fim de cada equipamento:** `write memory` (equivale a `copy running-config startup-config`)
-
-</details>
 
 <a id="1-cenário"></a>
 ## 1. Cenário: topologia e endereçamento
@@ -134,36 +117,38 @@
 
 > Toda a configuração desta secção é feita **no `Switch0`**, na aba **CLI**.
 
-### 3.1 — Hostname e senhas
+### 3.1 — [SW0] Hostname e senhas
 
 ```
 enable
 configure terminal
 hostname Switch0
-!
-! ===== SENHAS =====
-! "cinel" -> bloqueia o modo privilegiado (enable)
+
+! -> bloqueia o modo privilegiado (enable)
 enable secret cinel
-! encripta senhas em texto claro no running-config
+
+! -> encripta senhas em texto claro no running-config
 service password-encryption
-! aviso apresentado antes de qualquer login
+
+! -> aviso apresentado antes de qualquer login
 banner motd #Acesso restrito!#
-!
-! "cisco" -> bloqueia o acesso fisico pela porta de consola
+
+! -> bloqueia o acesso fisico pela porta de consola
 line console 0
- password cisco
- login
- exec-timeout 5 0
- logging synchronous
- exit
+	password cisco
+	login
+	exec-timeout 5 0
+	logging synchronous
+	exit
 ```
 
-**Verificar:** `show running-config` — procura `enable secret 5 ...` e `password 7 ...` (cifradas). Depois faz `exit` e volta a entrar: a consola pede a senha `cisco`, e `enable` pede `cinel`.
+**Verificar:** `show running-config` 
+— procura `enable secret 5 ...` e `password 7 ...` (cifradas). 
+Depois faz `exit` e volta a entrar: a consola pede a senha `cisco`, e `enable` pede `cinel`.
 
-### 3.2 — Criar as VLANs (10, 20, 30 e 40)
+### 3.2 — [SW0] Criar as VLANs (10, 20, 30 e 40)
 
 ```
-! ===== VLANS (apenas 10, 20, 30 e 40) =====
 vlan 10
  name Estudantes
 vlan 20
@@ -177,6 +162,7 @@ exit
 
 **Verificar:** `show vlan brief` — as VLANs 10, 20, 30 e 40 devem aparecer com os nomes corretos.
 
+### # VTP
 <details><summary><b>Alternativa: distribuir VLANs por VTP (opcional — clique para abrir)</b></summary>
 
 > ⚠️ Se optares por VTP, a ordem muda: primeiro configura os **trunks** (passo 3.3), só depois o VTP.
@@ -202,17 +188,21 @@ write memory
 
 </details>
 
-### 3.3 — Trunks (Fa0/1 → Router0, Fa0/2 → Switch1, Fa0/3 → Switch2) com VLAN nativa 40
+### 3.3 — [SW0] Trunks  com VLAN nativa 40
+
+**SW0 liga a estas portas:**
+Fa0/1 → Router0
+Fa0/2 → Switch1
+Fa0/3 → Switch2
 
 ```
-! ===== TRUNKS =====
 interface range fastEthernet 0/1-3
- switchport mode trunk
- switchport trunk allowed vlan 10,20,30,40
- switchport trunk native vlan 40
- switchport nonegotiate
- no shutdown
- exit
+  switchport mode trunk
+  switchport trunk allowed vlan 10,20,30,40
+  switchport trunk native vlan 40
+  switchport nonegotiate
+  no shutdown
+  exit
 ```
 
 > ⚠️ A VLAN nativa tem de ser **igual nas duas pontas** de cada trunk, senão o STP/CDP reporta *native VLAN mismatch*.
@@ -223,50 +213,55 @@ show interfaces trunk
 ```
 > ✅ Na coluna **Native vlan** deve aparecer `40` nas portas Fa0/1-3, e `10,20,30,40` em *VLANs allowed and active in management domain*.
 
-### 3.4 — Portas de acesso: PC-Gestao (Fa0/10, VLAN 40) e Server-DHCP (Fa0/24, VLAN 10)
+### 3.4 — [SW0] Portas de acesso
+
+PC-Gestao: Fa0/10, VLAN 40
+Server-DHCP: Fa0/24, VLAN 10
 
 ```
-! ===== PORTAS DE ACESSO =====
 interface fastEthernet 0/10
- description PC-Gestao
- switchport mode access
- switchport access vlan 40
- no shutdown
- exit
+  description PC-Gestao
+  switchport mode access
+  switchport access vlan 40
+  no shutdown
+  exit
+
 interface fastEthernet 0/24
- description Server-DHCP
- switchport mode access
- switchport access vlan 10
- no shutdown
- exit
+  description Server-DHCP
+  switchport mode access
+  switchport access vlan 10
+  no shutdown
+  exit
 ```
 
-**Verificar:** `show vlan brief` — Fa0/10 deve constar na VLAN 40 e Fa0/24 na VLAN 10. Se aparecerem na VLAN 1 (*default*), a configuração não foi aplicada.
+**Verificar:** `show vlan brief` 
+— Fa0/10 deve constar na VLAN 40 e Fa0/24 na VLAN 10. Se aparecerem na VLAN 1 (*default*), a configuração não foi aplicada.
 
-### 3.5 — Fechar as portas não utilizadas
+### 3.5 — [SW0] Fechar as portas não utilizadas
 
 Portas em uso no Switch0: `Fa0/1-3` (trunks), `Fa0/10` (PC-Gestao) e `Fa0/24` (Server-DHCP).
 
 ```
-! ===== FECHAR PORTAS NAO USADAS =====
 interface range fastEthernet 0/4-9, fastEthernet 0/11-23, gigabitEthernet 0/1-2
- switchport mode access
- shutdown
- exit
+  switchport mode access
+  shutdown
+  exit
 ```
 
-**Verificar:** `show ip interface brief` — as portas fechadas devem mostrar `administratively down`.
+**Verificar:** `show ip interface brief` 
+— as portas fechadas devem mostrar `administratively down`.
 
-### 3.6 — SVI de gestão (interface vlan 40)
+
+### 3.6 — [SW0] SVI de gestão (interface vlan 40)
 
 Permite gerir o switch remotamente (SSH/ping) a partir da rede de gestão.
 
 ```
-! ===== SVI DE GESTAO =====
 interface vlan 40
- ip address 192.168.40.2 255.255.255.0
- no shutdown
- exit
+  ip address 192.168.40.2 255.255.255.0
+  no shutdown
+  exit
+
 ip default-gateway 192.168.40.1
 ```
 
@@ -277,36 +272,38 @@ ping 192.168.40.1
 ```
 > ✅ A `Vlan40` deve estar `up/up` e o ping para o router deve responder.
 
-### 3.7 — SSH (acesso remoto seguro)
+### 3.7 — [SW0] SSH (acesso remoto seguro)
 
 ```
-! ===== SSH =====
-! "admin"/"cinel" -> bloqueia o acesso remoto SSH (linhas VTY)
 ip domain-name cinel.local
 crypto key generate rsa
 2048
 ip ssh version 2
+
+! -> bloqueia o acesso remoto SSH (linhas VTY)
 username admin privilege 15 secret cinel
-!
+
 ! ACL: so permite SSH a partir da rede de gestao (VLAN 40)
 access-list 10 permit 192.168.40.0 0.0.0.255
+
 line vty 0 4
- login local
- transport input ssh
- access-class 10 in
- exec-timeout 5 0
- logging synchronous
- exit
-!
+  login local
+  transport input ssh
+  access-class 10 in
+  exec-timeout 5 0
+  logging synchronous
+  exit
+
 end
 write memory
 ```
 
 > 📌 Se o exercício exigir Telnet também, muda para `transport input ssh telnet` (Telnet não é encriptado — usar só em laboratório).
 
-**Verificar:** `show ip ssh` — deve indicar `SSH version 2` e autenticação ativada.
+**Verificar:** `show ip ssh` 
+— deve indicar `SSH version 2` e autenticação ativada.
 
-### 3.8 — Bloco completo do Switch0 (copiar e colar de uma vez)
+### 3.8 — [SW0] Bloco completo do Switch0 (copiar e colar de uma vez)
 
 <details><summary><b>Script completo do Switch0 — clique para abrir</b></summary>
 
@@ -386,22 +383,23 @@ write memory
 
 > Toda a configuração desta secção é feita **no `Switch1`**, na aba **CLI**.
 
-### 4.1 — Hostname e senhas
-
-Igual ao Switch0.
+### 4.1 — [SW1] Hostname e senhas
 
 ```
 enable
 configure terminal
 hostname Switch1
-!
-! ===== SENHAS =====
-! "cinel" -> bloqueia o modo privilegiado (enable)
+
+! -> bloqueia o modo privilegiado (enable)
 enable secret cinel
+
+! -> encripta senhas em texto claro no running-config
 service password-encryption
+
+! -> aviso apresentado antes de qualquer login
 banner motd #Acesso restrito!#
-!
-! "cisco" -> bloqueia o acesso fisico pela porta de consola
+
+! -> bloqueia o acesso fisico pela porta de consola
 line console 0
  password cisco
  login
@@ -410,12 +408,15 @@ line console 0
  exit
 ```
 
-### 4.2 — Criar as VLANs (10, 20, 30 e 40)
+**Verificar:** `show running-config` 
+— procura `enable secret 5 ...` e `password 7 ...` (cifradas). 
+Depois faz `exit` e volta a entrar: a consola pede a senha `cisco`, e `enable` pede `cinel`.
+
+### 4.2 — [SW1] Criar as VLANs (10, 20, 30 e 40)
 
 > Com criação manual, as VLANs têm de existir **em cada switch**. (Se usaste VTP no Switch0, salta este passo — o Switch1 recebe-as como client.)
 
 ```
-! ===== VLANS =====
 vlan 10
  name Estudantes
 vlan 20
@@ -427,12 +428,32 @@ vlan 40
 exit
 ```
 
-**Verificar:** `show vlan brief`
+**Verificar:** `show vlan brief` — as VLANs 10, 20, 30 e 40 devem aparecer com os nomes corretos.
 
-### 4.3 — Trunk para o Switch0 (Fa0/24) com VLAN nativa 40
+### # VTP
+<details><summary><b>Alternativa: receber as VLANs por VTP (opcional — clique para abrir)</b></summary>
+
+> ⚠️ Se optares por VTP, a ordem muda: primeiro configura o **trunk** (passo 4.3), só depois o VTP.
+
+**VTP Client (Switch1):**
+```
+vtp domain cinel-domain
+vtp mode client
+vtp password cinel
+exit
+write memory
+```
+
+**Verificar:** `show vtp status` · `show vlan brief` (as VLANs devem aparecer sem as criares).
+
+</details>
+
+### 4.3 — [SW1] Trunk para o Switch0 (Fa0/24) com VLAN nativa 40
+
+**SW1 liga a esta porta:**
+Fa0/24 → Switch0
 
 ```
-! ===== TRUNK =====
 interface fastEthernet 0/24
  switchport mode trunk
  switchport trunk allowed vlan 10,20,30,40
@@ -448,35 +469,43 @@ show interfaces trunk
 ```
 > ✅ Fa0/24 deve aparecer `trunking`, 802.1Q, **Native vlan: 40**.
 
-### 4.4 — Portas de acesso aos PCs (Fa0/1→V10, Fa0/2→V20, Fa0/3→V30)
+### 4.4 — [SW1] Portas de acesso aos PCs
+
+PC0: Fa0/1, VLAN 10
+PC1: Fa0/2, VLAN 20
+PC2: Fa0/3, VLAN 30
 
 ```
-! ===== PORTAS DE ACESSO AOS PCS =====
 interface fastEthernet 0/1
+ description PC0
  switchport mode access
  switchport access vlan 10
  no shutdown
  exit
+
 interface fastEthernet 0/2
+ description PC1
  switchport mode access
  switchport access vlan 20
  no shutdown
  exit
+
 interface fastEthernet 0/3
+ description PC2
  switchport mode access
  switchport access vlan 30
  no shutdown
  exit
 ```
 
-**Verificar:** `show vlan brief` — Fa0/1 na VLAN 10, Fa0/2 na 20, Fa0/3 na 30.
+**Verificar:** `show vlan brief` 
+— Fa0/1 deve constar na VLAN 10, Fa0/2 na VLAN 20 e Fa0/3 na VLAN 30. Se aparecerem na VLAN 1 (*default*), a configuração não foi aplicada.
 
-### 4.5 — Fechar as portas não utilizadas
+### 4.5 — [SW1] Fechar as portas não utilizadas
 
 Portas em uso no Switch1: `Fa0/1-3` (PCs) e `Fa0/24` (trunk).
 
 ```
-! ===== FECHAR PORTAS NAO USADAS =====
 interface range fastEthernet 0/4-23, gigabitEthernet 0/1-2
  switchport mode access
  shutdown
@@ -485,10 +514,11 @@ interface range fastEthernet 0/4-23, gigabitEthernet 0/1-2
 
 **Verificar:** `show ip interface brief` — portas fechadas em `administratively down`.
 
-### 4.6 — SVI de gestão (interface vlan 40)
+### 4.6 — [SW1] SVI de gestão (interface vlan 40)
+
+Permite gerir o switch remotamente (SSH/ping) a partir da rede de gestão.
 
 ```
-! ===== SVI DE GESTAO =====
 interface vlan 40
  ip address 192.168.40.3 255.255.255.0
  no shutdown
@@ -498,17 +528,20 @@ ip default-gateway 192.168.40.1
 
 **Verificar:** `show ip interface brief | include Vlan40` · `ping 192.168.40.1`
 
-### 4.7 — SSH
+### 4.7 — [SW1] SSH (acesso remoto seguro)
 
 ```
-! ===== SSH =====
-! "admin"/"cinel" -> bloqueia o acesso remoto SSH (linhas VTY)
 ip domain-name cinel.local
 crypto key generate rsa
 2048
 ip ssh version 2
+
+! -> bloqueia o acesso remoto SSH (linhas VTY)
 username admin privilege 15 secret cinel
+
+! ACL: so permite SSH a partir da rede de gestao (VLAN 40)
 access-list 10 permit 192.168.40.0 0.0.0.255
+
 line vty 0 4
  login local
  transport input ssh
@@ -516,14 +549,17 @@ line vty 0 4
  exec-timeout 5 0
  logging synchronous
  exit
-!
+
 end
 write memory
 ```
 
-**Verificar:** `show ip ssh`
+> 📌 Se o exercício exigir Telnet também, muda para `transport input ssh telnet` (Telnet não é encriptado — usar só em laboratório).
 
-### 4.8 — Bloco completo do Switch1 (copiar e colar de uma vez)
+**Verificar:** `show ip ssh` 
+— deve indicar `SSH version 2` e autenticação ativada.
+
+### 4.8 — [SW1] Bloco completo do Switch1 (copiar e colar de uma vez)
 
 <details><summary><b>Script completo do Switch1 — clique para abrir</b></summary>
 
@@ -557,16 +593,19 @@ interface fastEthernet 0/24
  no shutdown
  exit
 interface fastEthernet 0/1
+ description PC0
  switchport mode access
  switchport access vlan 10
  no shutdown
  exit
 interface fastEthernet 0/2
+ description PC1
  switchport mode access
  switchport access vlan 20
  no shutdown
  exit
 interface fastEthernet 0/3
+ description PC2
  switchport mode access
  switchport access vlan 30
  no shutdown
@@ -606,20 +645,23 @@ write memory
 
 > Toda a configuração desta secção é feita **no `Switch2`**, na aba **CLI**. É **idêntica ao Switch1** — mudam apenas o **hostname** e o **IP da SVI** (`.4` em vez de `.3`).
 
-### 5.1 — Hostname e senhas
+### 5.1 — [SW2] Hostname e senhas
 
 ```
 enable
 configure terminal
 hostname Switch2
-!
-! ===== SENHAS =====
-! "cinel" -> bloqueia o modo privilegiado (enable)
+
+! -> bloqueia o modo privilegiado (enable)
 enable secret cinel
+
+! -> encripta senhas em texto claro no running-config
 service password-encryption
+
+! -> aviso apresentado antes de qualquer login
 banner motd #Acesso restrito!#
-!
-! "cisco" -> bloqueia o acesso fisico pela porta de consola
+
+! -> bloqueia o acesso fisico pela porta de consola
 line console 0
  password cisco
  login
@@ -628,14 +670,15 @@ line console 0
  exit
 ```
 
-**Verificar:** `show running-config` — procura `enable secret 5 <hash>` e as senhas cifradas. Depois faz `exit` e volta a entrar: a consola pede `cisco` e o `enable` pede `cinel`.
+**Verificar:** `show running-config` 
+— procura `enable secret 5 ...` e `password 7 ...` (cifradas). 
+Depois faz `exit` e volta a entrar: a consola pede a senha `cisco`, e `enable` pede `cinel`.
 
-### 5.2 — Criar as VLANs (10, 20, 30 e 40)
+### 5.2 — [SW2] Criar as VLANs (10, 20, 30 e 40)
 
 > Com criação manual, as VLANs têm de existir **em cada switch**. (Se usaste VTP no Switch0, salta este passo — o Switch2 recebe-as como client.)
 
 ```
-! ===== VLANS =====
 vlan 10
  name Estudantes
 vlan 20
@@ -649,10 +692,30 @@ exit
 
 **Verificar:** `show vlan brief` — as VLANs 10, 20, 30 e 40 devem aparecer com os nomes corretos.
 
-### 5.3 — Trunk para o Switch0 (Fa0/24) com VLAN nativa 40
+### # VTP
+<details><summary><b>Alternativa: receber as VLANs por VTP (opcional — clique para abrir)</b></summary>
+
+> ⚠️ Se optares por VTP, a ordem muda: primeiro configura o **trunk** (passo 5.3), só depois o VTP.
+
+**VTP Client (Switch2):**
+```
+vtp domain cinel-domain
+vtp mode client
+vtp password cinel
+exit
+write memory
+```
+
+**Verificar:** `show vtp status` · `show vlan brief` (as VLANs devem aparecer sem as criares).
+
+</details>
+
+### 5.3 — [SW2] Trunk para o Switch0 (Fa0/24) com VLAN nativa 40
+
+**SW2 liga a esta porta:**
+Fa0/24 → Switch0
 
 ```
-! ===== TRUNK =====
 interface fastEthernet 0/24
  switchport mode trunk
  switchport trunk allowed vlan 10,20,30,40
@@ -668,21 +731,29 @@ show interfaces trunk
 ```
 > ✅ Fa0/24 deve aparecer `trunking`, 802.1Q, **Native vlan: 40**.
 
-### 5.4 — Portas de acesso aos PCs (Fa0/1→V10, Fa0/2→V20, Fa0/3→V30)
+### 5.4 — [SW2] Portas de acesso aos PCs
+
+PC3: Fa0/1, VLAN 10
+PC4: Fa0/2, VLAN 20
+PC5: Fa0/3, VLAN 30
 
 ```
-! ===== PORTAS DE ACESSO AOS PCS =====
 interface fastEthernet 0/1
+ description PC3
  switchport mode access
  switchport access vlan 10
  no shutdown
  exit
+
 interface fastEthernet 0/2
+ description PC4
  switchport mode access
  switchport access vlan 20
  no shutdown
  exit
+
 interface fastEthernet 0/3
+ description PC5
  switchport mode access
  switchport access vlan 30
  no shutdown
@@ -691,14 +762,14 @@ interface fastEthernet 0/3
 
 > ⚠️ **Confirma com o teu enunciado:** se os PCs do Switch2 tiverem de ficar noutras VLANs (ex.: PC3 na VLAN 30), altera o `switchport access vlan X` da porta respetiva **antes** de fechar com `write memory`.
 
-**Verificar:** `show vlan brief` — Fa0/1 na VLAN 10, Fa0/2 na 20, Fa0/3 na 30.
+**Verificar:** `show vlan brief` 
+— Fa0/1 deve constar na VLAN 10, Fa0/2 na VLAN 20 e Fa0/3 na VLAN 30. Se aparecerem na VLAN 1 (*default*), a configuração não foi aplicada.
 
-### 5.5 — Fechar as portas não utilizadas
+### 5.5 — [SW2] Fechar as portas não utilizadas
 
 Portas em uso no Switch2: `Fa0/1-3` (PCs) e `Fa0/24` (trunk).
 
 ```
-! ===== FECHAR PORTAS NAO USADAS =====
 interface range fastEthernet 0/4-23, gigabitEthernet 0/1-2
  switchport mode access
  shutdown
@@ -707,10 +778,11 @@ interface range fastEthernet 0/4-23, gigabitEthernet 0/1-2
 
 **Verificar:** `show ip interface brief` — portas fechadas em `administratively down`.
 
-### 5.6 — SVI de gestão (interface vlan 40)
+### 5.6 — [SW2] SVI de gestão (interface vlan 40)
+
+Permite gerir o switch remotamente (SSH/ping) a partir da rede de gestão.
 
 ```
-! ===== SVI DE GESTAO =====
 interface vlan 40
  ip address 192.168.40.4 255.255.255.0
  no shutdown
@@ -720,17 +792,20 @@ ip default-gateway 192.168.40.1
 
 **Verificar:** `show ip interface brief | include Vlan40` · `ping 192.168.40.1`
 
-### 5.7 — SSH
+### 5.7 — [SW2] SSH (acesso remoto seguro)
 
 ```
-! ===== SSH =====
-! "admin"/"cinel" -> bloqueia o acesso remoto SSH (linhas VTY)
 ip domain-name cinel.local
 crypto key generate rsa
 2048
 ip ssh version 2
+
+! -> bloqueia o acesso remoto SSH (linhas VTY)
 username admin privilege 15 secret cinel
+
+! ACL: so permite SSH a partir da rede de gestao (VLAN 40)
 access-list 10 permit 192.168.40.0 0.0.0.255
+
 line vty 0 4
  login local
  transport input ssh
@@ -738,14 +813,17 @@ line vty 0 4
  exec-timeout 5 0
  logging synchronous
  exit
-!
+
 end
 write memory
 ```
 
-**Verificar:** `show ip ssh` — deve indicar `SSH version 2`. A partir do `PC-Gestao`: `ssh -l admin 192.168.40.4` (senha `cinel`).
+> 📌 Se o exercício exigir Telnet também, muda para `transport input ssh telnet` (Telnet não é encriptado — usar só em laboratório).
 
-### 5.8 — Bloco completo do Switch2 (copiar e colar de uma vez)
+**Verificar:** `show ip ssh` 
+— deve indicar `SSH version 2` e autenticação ativada. A partir do `PC-Gestao`: `ssh -l admin 192.168.40.4` (senha `cinel`).
+
+### 5.8 — [SW2] Bloco completo do Switch2 (copiar e colar de uma vez)
 
 <details><summary><b>Script completo do Switch2 — clique para abrir</b></summary>
 
@@ -779,16 +857,19 @@ interface fastEthernet 0/24
  no shutdown
  exit
 interface fastEthernet 0/1
+ description PC3
  switchport mode access
  switchport access vlan 10
  no shutdown
  exit
 interface fastEthernet 0/2
+ description PC4
  switchport mode access
  switchport access vlan 20
  no shutdown
  exit
 interface fastEthernet 0/3
+ description PC5
  switchport mode access
  switchport access vlan 30
  no shutdown
@@ -837,58 +918,72 @@ show ip interface brief
 
 > 📌 **Porquê o DHCP Relay:** o Server-DHCP (`192.168.10.254`) está fisicamente na VLAN 10. Os pedidos DHCP (broadcasts) das VLANs 20 e 30 são descartados pelo router por omissão. O comando `ip helper-address 192.168.10.254` converte esses broadcasts em **unicast** direcionados ao servidor.
 
-### 6.1 — Ativar a interface física (sem IP na porta física)
+### 6.1 — [R0] Ativar a interface física, hostname e senhas
 
 ```
 enable
 configure terminal
 hostname Router0
-!
-! ===== SENHAS (bloqueiam enable e consola do router) =====
+
+! -> bloqueia o modo privilegiado (enable)
 enable secret cinel
+
+! -> encripta senhas em texto claro no running-config
 service password-encryption
+
+! -> aviso apresentado antes de qualquer login
 banner motd #Acesso restrito!#
+
+! -> bloqueia o acesso fisico pela porta de consola
 line console 0
  password cisco
  login
  exec-timeout 5 0
  logging synchronous
  exit
-!
+
+! -> interface fisica sem IP (o IP fica nas sub-interfaces)
 interface gigabitEthernet 0/0
  no shutdown
  exit
 ```
 
-### 6.2 — Sub-interfaces (gateway de cada VLAN)
+**Verificar:** `show ip interface brief` — Gi0/0 deve aparecer `up/up` (sem IP address).
 
+### 6.2 — [R0] Sub-interfaces (gateway de cada VLAN)
+
+**VLAN 10 (Estudantes) — rede do servidor DHCP, sem helper:**
 ```
-! VLAN 10 (Estudantes) - rede do servidor DHCP, sem helper
 interface gigabitEthernet 0/0.10
  encapsulation dot1Q 10
  ip address 192.168.10.1 255.255.255.0
  exit
-!
-! VLAN 20 (Professores) - com DHCP Relay
+```
+
+**VLAN 20 (Professores) — com DHCP Relay:**
+```
 interface gigabitEthernet 0/0.20
  encapsulation dot1Q 20
  ip address 192.168.20.1 255.255.255.0
  ip helper-address 192.168.10.254
  exit
-!
-! VLAN 30 (Direcao) - com DHCP Relay
+```
+
+**VLAN 30 (Direcao) — com DHCP Relay:**
+```
 interface gigabitEthernet 0/0.30
  encapsulation dot1Q 30
  ip address 192.168.30.1 255.255.255.0
  ip helper-address 192.168.10.254
  exit
-!
-! VLAN 40 (Native/Gestao) - sem DHCP Relay (nao ha PCs)
+```
+
+**VLAN 40 (Native/Gestao) — sem DHCP Relay (não há PCs):**
+```
 interface gigabitEthernet 0/0.40
  encapsulation dot1Q 40 native
  ip address 192.168.40.1 255.255.255.0
  exit
-!
 end
 write memory
 ```
@@ -902,7 +997,7 @@ show running-config | include helper
 ```
 > ✅ Todas as sub-interfaces (Gi0/0, .10, .20, .30, .40) devem estar `up/up`, e o helper deve aparecer nas .20 e .30.
 
-### 6.3 — SSH no Router0 (opcional — se o exercício pedir)
+### 6.3 — [R0] SSH no Router0 (opcional — se o exercício pedir)
 
 <details><summary><b>Script SSH do Router0 — clique para abrir</b></summary>
 
